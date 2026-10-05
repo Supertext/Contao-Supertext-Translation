@@ -90,7 +90,7 @@ Integration tests need a Contao installation with this bundle installed and a mi
 composer create-project contao/managed-edition:5.7.* ../contao-dev
 cd ../contao-dev
 composer config repositories.supertext path ../Contao-Supertext-Translation
-composer require supertext/contao-supertext-translation:@dev terminal42/contao-changelanguage
+composer require -W supertext/contao-supertext-translation:@dev terminal42/contao-changelanguage
 composer require --dev phpunit/phpunit:^12.4 symfony/dotenv
 echo 'DATABASE_URL=mysql://user:pass@127.0.0.1:3306/contao_test' > .env.local
 vendor/bin/contao-console contao:migrate --no-interaction

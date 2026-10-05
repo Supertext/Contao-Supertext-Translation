@@ -59,7 +59,7 @@ jobs:
           composer create-project contao/managed-edition:${{ matrix.contao }}.* app --no-progress
           cd app
           composer config repositories.supertext path ../bundle
-          composer require --no-progress supertext/contao-supertext-translation:@dev terminal42/contao-changelanguage
+          composer require --no-progress --with-all-dependencies supertext/contao-supertext-translation:@dev terminal42/contao-changelanguage
           composer require --no-progress --dev phpunit/phpunit:^12.4 symfony/dotenv
           echo "DATABASE_URL=$CONTAO_TEST_DATABASE_URL" > .env.local
           echo "APP_SECRET=ci-secret" >> .env.local
