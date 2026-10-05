@@ -44,6 +44,8 @@ Set the key as an environment variable of the web server, or in the `.env.local`
 SUPERTEXT_API_KEY=your-key-here
 ```
 
+The key works with or without the `Supertext-Auth-Key ` prefix that Supertext shows.
+
 Without a key, the translate screen shows "No Supertext API key is configured" and the *Translate* button is disabled.
 
 ## Permissions
@@ -128,6 +130,7 @@ Remove the package (Contao Manager or `composer remove supertext/contao-supertex
 | "There is no other language of this website you may edit" | No other website root with a different language and the same domain, or the user can't edit those roots (pagemounts, page permissions). |
 | "No Supertext API key is configured" | Set `SUPERTEXT_API_KEY` and clear the cache. |
 | "Authentication failure" | Wrong key, or a key for another environment (`live` vs `staging`). |
+| "Too many requests to Supertext" | Supertext's per-second rate limit. Each request is retried up to 4 times automatically; if it still appears, translate fewer languages at once and try again. |
 | "Your Supertext translation limit is exceeded" | The Supertext subscription quota is used up. |
 | `INVALID_LANGUAGE_PAIR` in the error | A root's language isn't a code Supertext knows; add a `language_map` entry. |
 | "Timed out waiting…" | Very long page or slow service: raise `timeout`, and the web server timeouts. |

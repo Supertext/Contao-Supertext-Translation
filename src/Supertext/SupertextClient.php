@@ -113,7 +113,8 @@ class SupertextClient
 
         $response = $this->request('POST', 'translate/ai/file', [
             'headers' => $form->getPreparedHeaders()->toArray(),
-            'body' => $form->bodyToIterable(),
+            // A string, not an iterable: a request retried after HTTP 429 sends it again.
+            'body' => $form->bodyToString(),
         ]);
 
         $data = json_decode($response->getContent(false), true);
@@ -205,16 +206,26 @@ class SupertextClient
 
         $options['headers'] = [
             ...($options['headers'] ?? []),
-            'Authorization: Supertext-Auth-Key '.$this->apiKey,
+            'Authorization: '.self::authHeader($this->apiKey),
             'Accept: application/json',
         ];
         $options['timeout'] ??= 30;
 
-        try {
-            $response = $this->httpClient->request($method, $this->baseUrl.$path, $options);
-            $status = $response->getStatusCode();
-        } catch (TransportExceptionInterface $e) {
-            throw new SupertextException('transport_error', 'Could not reach Supertext: '.$e->getMessage(), null, $e);
+        // The API limits requests per second per key (HTTP 429), which translating into
+        // several languages at once can hit: wait and retry a few times.
+        for ($attempt = 0; ; ++$attempt) {
+            try {
+                $response = $this->httpClient->request($method, $this->baseUrl.$path, $options);
+                $status = $response->getStatusCode();
+            } catch (TransportExceptionInterface $e) {
+                throw new SupertextException('transport_error', 'Could not reach Supertext: '.$e->getMessage(), null, $e);
+            }
+
+            if (429 !== $status || $attempt >= self::RATE_LIMIT_RETRIES) {
+                break;
+            }
+
+            ($this->sleep)(self::retryDelayMs($attempt, $response->getHeaders(false)['retry-after'][0] ?? null));
         }
 
         if ($status < 200 || $status >= 300) {
@@ -222,5 +233,30 @@ class SupertextClient
         }
 
         return $response;
+    }
+
+    /** Retries after HTTP 429. */
+    public const RATE_LIMIT_RETRIES = 4;
+
+    /**
+     * Wait before retry `$attempt` (0-based): the Retry-After header (seconds) if present,
+     * else 1 s, 2 s, 4 s, 8 s plus up to 250 ms jitter.
+     */
+    public static function retryDelayMs(int $attempt, string|null $retryAfter): int
+    {
+        if (null !== $retryAfter && is_numeric($retryAfter) && (float) $retryAfter >= 0) {
+            return (int) min(30_000, (float) $retryAfter * 1000);
+        }
+
+        return (1000 << min($attempt, 3)) + random_int(0, 250);
+    }
+
+    /**
+     * Authorization header value. Accepts the key with or without the
+     * `Supertext-Auth-Key ` prefix (Supertext shows it with the prefix).
+     */
+    public static function authHeader(string $apiKey): string
+    {
+        return 'Supertext-Auth-Key '.preg_replace('/^Supertext-Auth-Key\s+/i', '', trim($apiKey));
     }
 }

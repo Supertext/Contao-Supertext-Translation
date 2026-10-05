@@ -107,6 +107,58 @@ final class SupertextClientTest extends TestCase
         }
     }
 
+    public function testRetriesWhenRateLimited(): void
+    {
+        $fake = new FakeSupertext();
+        $fake->rateLimited = 3;
+        $waits = [];
+        $client = new SupertextClient($fake->client(), 'test-key', 'https://api.test/v1', 1000, 180_000, static function (int $ms) use (&$waits): void { $waits[] = $ms; });
+
+        $html = $client->translateHtml('<div data-st-id="a">Hallo</div>', 'it-CH', 'de');
+
+        $this->assertStringContainsString('[it-CH] Hallo', $html);
+        // The upload is sent again in full after each 429.
+        $uploads = $fake->calls(static fn ($c) => 'POST' === $c['method']);
+        $this->assertCount(4, $uploads);
+        $this->assertSame($uploads[0]['body'], $uploads[3]['body']);
+        $this->assertCount(3, $waits);
+        $this->assertGreaterThanOrEqual(1000, $waits[0]);
+        $this->assertGreaterThanOrEqual(4000, $waits[2]);
+    }
+
+    public function testGivesUpAfterFourRetries(): void
+    {
+        $fake = new FakeSupertext();
+        $fake->rateLimited = 5;
+
+        try {
+            $this->client($fake)->translateHtml('<div data-st-id="a">Hallo</div>', 'it-CH');
+            $this->fail('Expected a SupertextException.');
+        } catch (SupertextException $e) {
+            $this->assertSame('too_many_requests', $e->errorCode);
+        }
+
+        $this->assertCount(5, $fake->calls);
+    }
+
+    public function testRetryDelayUsesRetryAfter(): void
+    {
+        $this->assertSame(3000, SupertextClient::retryDelayMs(0, '3'));
+        $this->assertSame(30_000, SupertextClient::retryDelayMs(0, '120'));
+        $delay = SupertextClient::retryDelayMs(1, null);
+        $this->assertTrue($delay >= 2000 && $delay <= 2250);
+    }
+
+    public function testAcceptsKeyWithPrefix(): void
+    {
+        $fake = new FakeSupertext();
+        $html = $this->client($fake, '  Supertext-Auth-Key test-key ')->translateHtml('<div data-st-id="a">Hallo</div>', 'fr-CH');
+
+        $this->assertStringContainsString('[fr-CH] Hallo', $html);
+        $this->assertSame('Supertext-Auth-Key abc', SupertextClient::authHeader('abc'));
+        $this->assertSame('Supertext-Auth-Key abc', SupertextClient::authHeader('supertext-auth-key abc'));
+    }
+
     public function testRefusesWithoutKey(): void
     {
         $fake = new FakeSupertext();

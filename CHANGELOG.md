@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- Requests that hit Supertext's per-second rate limit (HTTP 429), e.g. when translating into several languages, are retried up to 4 times instead of failing that language.
+- The API key works with or without the `Supertext-Auth-Key ` prefix Supertext shows.
+
 ### Added
 
 - Contao 5.7 and 6.0 bundle `supertext/contao-supertext-translation`.

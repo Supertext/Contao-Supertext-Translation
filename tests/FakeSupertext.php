@@ -21,6 +21,9 @@ final class FakeSupertext
 
     private int $counter = 0;
 
+    /** Answer this many requests with HTTP 429 (rate limit) first. */
+    public int $rateLimited = 0;
+
     /** @var list<array{html: string, target: string, source: string, politeness: string, type: string}> every uploaded file */
     public array $submitted = [];
 
@@ -101,6 +104,12 @@ final class FakeSupertext
 
         if ($this->failStatus) {
             return new MockResponse('nope', ['http_code' => $this->failStatus]);
+        }
+
+        if ($this->rateLimited > 0) {
+            --$this->rateLimited;
+
+            return new MockResponse('{"error_code":"RATE_LIMIT_EXCEEDED"}', ['http_code' => 429]);
         }
 
         if ('GET' === $method && str_ends_with($url, '/features')) {

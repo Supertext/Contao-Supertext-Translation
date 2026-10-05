@@ -73,6 +73,8 @@ AI file translation API v1, same as the WordPress and Payload plugins. Base URLs
 | Delete | `DELETE translate/ai/file/{id}` | always attempted (expires after 24 h anyway) |
 | Key check | `GET features` | `SupertextClient::validateApiKey()` (not wired to the UI yet) |
 
+The key is sent as `Authorization: Supertext-Auth-Key <key>`; a pasted prefix is stripped (`SupertextClient::authHeader()`). HTTP 429 (`RATE_LIMIT_EXCEEDED`, a per-second limit per key) is retried up to 4 times: `Retry-After` if sent, else 1/2/4/8 s plus jitter (`retryDelayMs()`); uploads are sent as a string so they can be repeated.
+
 HTTP errors → `SupertextException::$errorCode`: 401/403 `authentication_failure`, 404 `not_found`, 413 `payload_too_large`, 429 `too_many_requests`, 500/502/503 `service_unavailable`, else `unexpected_status`; network failures `transport_error`.
 
 ## Local setup
