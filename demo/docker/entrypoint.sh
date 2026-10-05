@@ -44,4 +44,9 @@ php vendor/bin/contao-console cache:warmup
 mkdir -p /tmp/symfony-lock
 chown -R www-data:www-data var public files system assets /tmp/symfony-lock 2>/dev/null || true
 
+# Exactly one Apache MPM: mod_php needs prefork. On some hosts (Railway) another MPM
+# ends up enabled, and Apache refuses to start with "More than one MPM loaded".
+rm -f /etc/apache2/mods-enabled/mpm_event.* /etc/apache2/mods-enabled/mpm_worker.*
+[ -e /etc/apache2/mods-enabled/mpm_prefork.load ] || a2enmod -q mpm_prefork
+
 exec apache2-foreground

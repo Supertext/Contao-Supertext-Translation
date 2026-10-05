@@ -123,7 +123,7 @@ Variables (documented in `demo/.env.example`):
 
 | Variable | |
 | --- | --- |
-| `DATABASE_URL` | `mysql://user:pass@host:3306/db` (or Railway's `MYSQLHOST`, `MYSQLUSER`, … are combined by the entrypoint) |
+| `DATABASE_URL` | `mysql://user:pass@host:3306/db` (MySQL 8.4 or MariaDB; not MySQL 9) (or Railway's `MYSQLHOST`, `MYSQLUSER`, … are combined by the entrypoint) |
 | `APP_SECRET` | random string |
 | `SUPERTEXT_API_KEY`, `SUPERTEXT_ENVIRONMENT`, `SUPERTEXT_API_URL` | Supertext |
 | `DEMO_ADMIN_EMAIL`, `DEMO_ADMIN_PASSWORD`, `DEMO_EDITOR_EMAIL`, `DEMO_EDITOR_PASSWORD` | demo accounts |
@@ -141,7 +141,11 @@ The entrypoint waits for the database, runs `contao:migrate`, `supertext:demo:se
 
 ### Railway
 
-Project **supertext-cms-demos-php** (region Amsterdam): service **Contao** from this repository's `main` (Dockerfile `demo/Dockerfile`, build context = repo root, healthcheck `/contao/login`) and **MySQL** (Railway template, MySQL 9, volume). `DATABASE_URL` references the MySQL service's variables. Live: <https://contao-production.up.railway.app> (admin at `/contao`). Pushes to `main` deploy automatically (Railway's GitHub app needs access to this repository).
+Project **supertext-cms-demos-php** (region Amsterdam): service **Contao** from this repository's `main` (Dockerfile `demo/Dockerfile`, build context = repo root, healthcheck `/contao/login`) and **MySQL-8** (image `mysql:8.4`, volume `mysql8-volume` at `/var/lib/mysql`). `DATABASE_URL` references the MySQL-8 service's variables.
+
+Use MySQL 8.4 (or MariaDB), **not MySQL 9**: MySQL 9.1 made `EXTERNAL` a reserved word and Contao's `tl_layout.external` column breaks `contao:migrate`. (The project still contains the first, unused `MySQL` service on MySQL 9.)
+
+The entrypoint also makes sure only Apache's prefork MPM is enabled; on Railway the official `php:*-apache` image otherwise fails with "More than one MPM loaded".
 
 To reset the demo: drop and recreate the `contao` database in the MySQL service, then redeploy.
 

@@ -13,7 +13,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends libicu-dev libzip-dev libpng-dev libjpeg62-turbo-dev libwebp-dev libfreetype6-dev unzip git mariadb-client \
     && docker-php-ext-configure gd --with-jpeg --with-webp --with-freetype \
     && docker-php-ext-install -j"$(nproc)" intl zip gd pdo_mysql opcache \
-    && a2enmod rewrite headers \
+    && (a2dismod -f mpm_event mpm_worker || true) && a2enmod mpm_prefork rewrite headers \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
