@@ -22,7 +22,9 @@ WORKDIR /var/www/html
 ENV COMPOSER_ALLOW_SUPERUSER=1 APP_ENV=prod
 
 # The demo project, then the bundle from this repository as a path repository.
-COPY demo/composer.json demo/.env ./
+COPY demo/composer.json ./
+# Real values come from the platform's variables; .env only sets the environment.
+RUN printf 'APP_ENV=prod\n' > .env
 COPY composer.json README.md LICENSE plugin/
 COPY src plugin/src
 COPY config plugin/config
