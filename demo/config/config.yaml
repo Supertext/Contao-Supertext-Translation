@@ -1,0 +1,14 @@
+# Supertext settings come from environment variables (Railway), never from this file.
+supertext_translation:
+    api_key: '%env(default::SUPERTEXT_API_KEY)%'
+    environment: '%env(default:supertext_environment_default:SUPERTEXT_ENVIRONMENT)%'
+    api_url: '%env(default::SUPERTEXT_API_URL)%'
+    politeness:
+        de-CH: more
+
+parameters:
+    supertext_environment_default: live
+
+contao:
+    localconfig:
+        adminEmail: 'demo@example.com'

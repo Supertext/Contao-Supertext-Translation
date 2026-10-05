@@ -1,0 +1,3 @@
+supertext_translation:
+    resource: ../src/Controller/
+    type: attribute

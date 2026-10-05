@@ -1,0 +1,94 @@
+{% trans_default_domain 'contao_default' %}
+{% extends '@Contao/be_main.html.twig' %}
+
+{% block main_content %}
+    <div id="tl_buttons">
+        <a href="{{ back_url }}" class="header_back" title="{{ 'MSC.backBTTitle'|trans }}">{{ 'MSC.backBT'|trans }}</a>
+    </div>
+
+    <form method="post" class="tl_form tl_edit_form supertext-translate" data-turbo="false">
+        <div class="tl_formbody_edit">
+            <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+
+            <div class="tl_tbox">
+                <h2 class="sub_headline">{{ 'MSC.supertext.headline'|trans([page.title]) }}</h2>
+
+                {% if not api_key_configured %}
+                    <p class="tl_error">{{ 'MSC.supertext.noApiKey'|trans }}</p>
+                {% endif %}
+
+                {% if error %}
+                    <p class="tl_error">{{ error|trans }}</p>
+                {% endif %}
+
+                {% if report %}
+                    {% for target in report.targets %}
+                        {% if target.ok %}
+                            <div class="tl_confirm">
+                                <strong>{{ target.root.title }} ({{ target.root.language }})</strong>:
+                                {{ 'MSC.supertext.done'|trans([target.pages|length, target.articles, target.elements]) }}
+                                {% if target.hidden %} {{ 'MSC.supertext.hidden'|trans([target.hidden]) }}{% endif %}
+                                <ul>
+                                    {% for p in target.pages %}
+                                        <li>
+                                            <a href="{{ path('contao_backend', {do: 'article', pn: p.id}) }}">{{ p.title }}</a>
+                                            {% if p.created %}<em>— {{ 'MSC.supertext.created'|trans }}</em>{% endif %}
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% if target.missing|length %}
+                                <p class="tl_info">{{ 'MSC.supertext.missing'|trans([target.missing|length]) }}</p>
+                            {% endif %}
+                            {% for warning in target.warnings %}
+                                <p class="tl_info">{{ warning }}</p>
+                            {% endfor %}
+                        {% else %}
+                            <p class="tl_error"><strong>{{ target.root.title }} ({{ target.root.language }})</strong>: {{ target.error }}</p>
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+
+                {% if roots is empty %}
+                    <p class="tl_info">{{ 'MSC.supertext.noRoots'|trans }}</p>
+                {% else %}
+                    <div class="widget">
+                        <fieldset class="tl_checkbox_container">
+                            <legend>{{ 'MSC.supertext.targets'|trans }}</legend>
+                            {% for root in roots %}
+                                <input type="checkbox" class="tl_checkbox" name="targets[]" id="st_target_{{ root.id }}" value="{{ root.id }}"{% if root.id in selected or (selected is empty and report is null) %} checked{% endif %}>
+                                <label for="st_target_{{ root.id }}" class="tl_checkbox_label">
+                                    {{ root.title }} <span class="label-info">[{{ root.language }}]</span>
+                                    {% if root.targetPageId %}— {{ 'MSC.supertext.exists'|trans }}{% else %}— {{ 'MSC.supertext.new'|trans }}{% endif %}
+                                </label>
+                                <br>
+                            {% endfor %}
+                        </fieldset>
+                        <p class="tl_help" style="white-space: normal">{{ 'MSC.supertext.help'|trans }}</p>
+                    </div>
+
+                    {% if page.has_subpages and page.type != 'root' %}
+                        <div class="widget">
+                            <div class="tl_checkbox_single_container">
+                                <input type="checkbox" class="tl_checkbox" name="subpages" id="st_subpages" value="1"{% if include_subpages %} checked{% endif %}>
+                                <label for="st_subpages">{{ 'MSC.supertext.subpages'|trans }}</label>
+                            </div>
+                        </div>
+                    {% elseif page.type == 'root' %}
+                        <p class="tl_help" style="white-space: normal">{{ 'MSC.supertext.rootHelp'|trans }}</p>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+
+        {% if roots is not empty %}
+            <div class="tl_formbody_submit">
+                <div class="tl_submit_container">
+                    <button type="submit" class="tl_submit" onclick="this.disabled=true;this.textContent='{{ 'MSC.supertext.running'|trans|e('js') }}';this.form.submit();"{% if not api_key_configured %} disabled{% endif %}>
+                        {{ 'MSC.supertext.submit'|trans }}
+                    </button>
+                </div>
+            </div>
+        {% endif %}
+    </form>
+{% endblock %}

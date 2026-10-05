@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ['8.3', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: dom, intl, gd, zip, pdo_mysql
+          coverage: none
+      - run: composer install --no-interaction --no-progress
+      - run: vendor/bin/phpunit --testsuite unit
+
+  integration:
+    name: integration (Contao ${{ matrix.contao }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - contao: '5.7'
+            php: '8.3'
+          - contao: '6.0'
+            php: '8.4'
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: contao_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      COMPOSER_NO_INTERACTION: '1'
+      CONTAO_TEST_DATABASE_URL: mysql://root:root@127.0.0.1:3306/contao_test?serverVersion=8.4.0&charset=utf8mb4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: bundle
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: dom, intl, gd, zip, pdo_mysql
+          coverage: none
+      - name: Create a Contao ${{ matrix.contao }} installation with this bundle
+        run: |
+          composer create-project contao/managed-edition:${{ matrix.contao }}.* app --no-progress
+          cd app
+          composer config repositories.supertext path ../bundle
+          composer require --no-progress supertext/contao-supertext-translation:@dev terminal42/contao-changelanguage
+          composer require --no-progress --dev phpunit/phpunit:^12.4 symfony/dotenv
+          echo "DATABASE_URL=$CONTAO_TEST_DATABASE_URL" > .env.local
+          echo "APP_SECRET=ci-secret" >> .env.local
+          vendor/bin/contao-console contao:migrate --no-interaction --no-backup
+      - name: Integration tests
+        working-directory: app
+        run: CONTAO_PROJECT_DIR=$PWD vendor/bin/phpunit -c ../bundle/phpunit.xml.dist --testsuite integration

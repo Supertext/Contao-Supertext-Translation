@@ -1,0 +1,13 @@
+/plugin
+/vendor/
+/var/
+/assets/
+/public/bundles/
+/public/assets
+/public/files
+/public/share
+/public/system
+/system/
+/files/
+/composer.lock
+.env.local

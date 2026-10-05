@@ -1,0 +1,11 @@
+vendor
+demo/vendor
+demo/var
+demo/plugin
+demo/assets
+demo/system
+demo/files
+demo/public/bundles
+.phpunit.cache
+.git
+**/.env.local
