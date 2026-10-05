@@ -9,28 +9,36 @@ In Contao, each language of a website has its own page tree: one website root pe
 1. Open **Content → Pages** (site structure).
 2. Click the **translate icon** (two letters, green) on the page you want to translate.
 
-   ![Site structure with the translate icon](images/01-site-structure.png)
+   ![Site structure: the English pages and empty German, French and Italian website roots, each row with the green translate icon](images/01-site-structure.png)
 
-3. Choose the languages to translate **into**. Languages that already have a translation of this page show "translation exists, will be updated".
+3. Choose the languages to translate **into**. "Not translated yet" means a new page will be created.
 4. If the page has subpages, tick **Also translate all subpages** to translate the whole branch.
 5. Click **Translate** and wait. One page takes a few seconds; keep the window open.
 
-   ![Translate screen](images/02-translate-screen.png)
+   ![Translate screen for "About us": German, French and Italian ticked, all "not translated yet", and the "Also translate all subpages" option](images/02-translate-screen.png)
 
 The result lists every language with the translated pages. Click a page to open its articles.
 
-![Result](images/03-translate-result.png)
+![Result after translating the English website: for German, French and Italian, four new unpublished pages each, e.g. Startseite, Accueil, Pagina iniziale](images/03-translate-result.png)
 
 **Translate a whole website:** click the translate icon on the website root (e.g. *English*). All pages of that language are translated. This can take several minutes.
 
+The new pages appear in each language's tree, unpublished (crossed-out eye):
+
+![Site structure after translating: German, French and Italian trees with the translated, unpublished pages](images/05-site-structure-translated.png)
+
+**Translating again:** languages that already have a translation of the page show "translation exists, will be updated". Translating updates those pages in place (see below).
+
+![Translate screen for a page that is already translated: every language shows "translation exists, will be updated"](images/04-retranslate-warning.png)
+
 ## Review and publish
 
-- **New pages are created unpublished** (grey in the site structure). Check them, adjust if needed, then publish them like any other page.
+- **New pages are created unpublished** (grey, crossed-out eye in the site structure). Check them, adjust if needed, then publish them like any other page: open the page settings (pencil), tick **Publish page** and save.
 - **Existing translations are updated in place.** The previous version stays in the version history (*Restore* / version list of the record), so you can go back.
 - If the translated page's parent doesn't exist in the target language yet, Supertext translates the parent too, so the page tree stays the same in every language.
 - With the language switcher installed, translated pages are linked to their original: visitors can switch languages on the page.
 
-![Translated page on the website](images/04-website-german.png)
+![The German home page on the website after publishing: translated headings, bold and italic text, a link, an insert tag and a list, with the EN / DE-CH language switcher](images/06-website-german.png)
 
 ## What is translated
 

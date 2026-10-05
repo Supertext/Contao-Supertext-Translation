@@ -6,6 +6,7 @@ namespace App\Command;
 
 use Contao\BackendUser;
 use Contao\Controller;
+use Contao\StringUtil;
 use Contao\CoreBundle\Framework\ContaoFramework;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -112,11 +113,6 @@ final class DemoSetupCommand extends Command
     private function ensureEditorGroup(): int
     {
         $id = $this->db->fetchOne('SELECT id FROM tl_user_group WHERE name = ?', ['Editors']);
-
-        if (false !== $id) {
-            return (int) $id;
-        }
-
         $controller = $this->framework->getAdapter(Controller::class);
         $alexf = [];
 
@@ -124,10 +120,25 @@ final class DemoSetupCommand extends Command
             $controller->loadDataContainer($table);
 
             foreach ($GLOBALS['TL_DCA'][$table]['fields'] ?? [] as $field => $config) {
-                if (!empty($config['exclude'])) {
+                // Since Contao 5 every field is permission-controlled unless it says
+                // 'exclude' => false (e.g. "published" has no exclude key at all).
+                if (false !== ($config['exclude'] ?? true)) {
                     $alexf[] = $table.'::'.$field;
                 }
             }
+        }
+
+        if (false !== $id) {
+            // Add field permissions that are missing (e.g. publishing); never remove any.
+            $current = StringUtil::deserialize($this->db->fetchOne('SELECT alexf FROM tl_user_group WHERE id = ?', [$id]), true);
+            $missing = array_values(array_diff($alexf, $current));
+
+            if ($missing) {
+                $this->db->update('tl_user_group', ['alexf' => serialize([...$current, ...$missing])], ['id' => $id]);
+                $this->io->writeln(\sprintf('Allowed the "Editors" group %d more field(s), e.g. publishing pages.', \count($missing)));
+            }
+
+            return (int) $id;
         }
 
         $elements = [];

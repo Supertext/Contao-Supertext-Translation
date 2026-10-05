@@ -55,11 +55,13 @@ Administrators can always translate. For other users:
 1. *User groups* (or the user) → **Supertext** → tick **Translate with Supertext**.
 2. Make sure the group can edit the target language trees: the website roots of the other languages in *Pagemounts*, the page types in *Allowed page types*, and edit permission on those pages (*Site structure → page → Permissions*).
 
-![Supertext permission in the user group](images/05-group-permission.png)
+![User group settings, Supertext section: the "Translate with Supertext" permission ticked](images/08-group-permission.png)
 
 The *Translate with Supertext* icon only appears for users with the permission, and the translate screen only offers languages whose website root the user may edit.
 
 ## Language setup
+
+![Settings of the German website root: Language de-CH, Language fallback off](images/07-language-root.png)
 
 Each website root's *Language* is sent to Supertext as the target language (`de-CH` stays `de-CH`); the source language is sent as its primary subtag (`de-CH` → `de`), because Supertext rejects regional source codes. Contao's own codes (`de`, `de-CH`, `fr`, `pt-BR`) need no setup.
 

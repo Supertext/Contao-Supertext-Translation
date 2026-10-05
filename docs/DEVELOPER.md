@@ -118,7 +118,7 @@ The integration tests **empty** `tl_page`, `tl_article`, `tl_content` and `tl_ve
 
 A Contao 6.0 site using the bundle from this repository (path repository, copied into the image), with terminal42/contao-changelanguage. `demo/src/Command/DemoSetupCommand.php` (`supertext:demo:setup`) runs on every start and is idempotent:
 
-- **Accounts** (see the demo accounts rule in `CLAUDE.md`): `DEMO_ADMIN_EMAIL`/`DEMO_ADMIN_PASSWORD` → administrator; `DEMO_EDITOR_EMAIL`/`DEMO_EDITOR_PASSWORD` → member of the **Editors** group (pages and articles modules, all page types, all fields, all content elements, the language roots as pagemounts, edit permission via the roots' `chmod`, and the Supertext permission). Log in with the e-mail address. Missing accounts are created; existing ones are never changed; a password shorter than Contao's minimum (8) is skipped with a warning. Contao has no browser "create first admin" screen; without these variables no accounts are created (use `contao:user:create`).
+- **Accounts** (see the demo accounts rule in `CLAUDE.md`): `DEMO_ADMIN_EMAIL`/`DEMO_ADMIN_PASSWORD` → administrator; `DEMO_EDITOR_EMAIL`/`DEMO_EDITOR_PASSWORD` → member of the **Editors** group (pages and articles modules, all page types, all fields, all content elements, the language roots as pagemounts, edit permission via the roots' `chmod`, and the Supertext permission). Log in with the e-mail address. Since Contao 5 every field is permission-controlled unless it sets `'exclude' => false`, so the group is allowed every such field of pages, articles and content elements (including *Publish page*); on an existing group, missing field permissions are added (never removed). Missing accounts are created; existing ones are never changed; a password shorter than Contao's minimum (8) is skipped with a warning. Contao has no browser "create first admin" screen; without these variables no accounts are created (use `contao:user:create`).
 - **Content** (only when there is no website root yet): theme, page layout with navigation and language switcher, website roots `en` (fallback, `/en/`), `de-CH` (`/de/`), `fr-CH` (`/fr/`), `it-CH` (`/it/`), and English pages with articles, text, list, table, element group, hyperlink and insert tags. The other roots start empty; translate *English* to fill them.
 
 Variables (documented in `demo/.env.example`):
@@ -150,6 +150,19 @@ Use MySQL 8.4 (or MariaDB), **not MySQL 9**: MySQL 9.1 made `EXTERNAL` a reserve
 The entrypoint also makes sure only Apache's prefork MPM is enabled; on Railway the official `php:*-apache` image otherwise fails with "More than one MPM loaded".
 
 To reset the demo: drop and recreate the `contao` database in the MySQL service, then redeploy.
+
+## Docs screenshots
+
+`docs/images/*.png` are made by `test/docs/screenshots.mjs` (Playwright) from a **fresh** demo whose `SUPERTEXT_API_URL` points at `test/docs/stand-in.mjs`: a stand-in for the Supertext API that returns real German, French and Italian for the demo content (`test/docs/translations.json`, keyed by language and by each segment's HTML as sent, insert-tag placeholders included). Unknown segments come back unchanged and are logged; if the demo content changes, add their translations. Regenerate the images in the same commit as UI changes:
+
+```bash
+cd test/docs && npm install
+npm run stand-in &                          # http://127.0.0.1:8765/v1/
+# fresh demo (new database) with SUPERTEXT_API_URL=http://127.0.0.1:8765/v1/, e.g. on port 8080
+CONTAO_URL=http://127.0.0.1:8080 EDITOR_EMAIL=… EDITOR_PASSWORD=… ADMIN_EMAIL=… ADMIN_PASSWORD=… npm run screenshots
+```
+
+The editor translates the English website, opens the translate screen again (retranslate warning), publishes the German home page through its settings and views it on the website; the administrator part shows the German root's language settings and the group permission. 1200 px wide at 1×, cropped to the relevant part. Locally (no TLS proxy) the script sends `X-Forwarded-Proto: https` for the front-end visit, because the demo's website roots require HTTPS.
 
 ## Releasing
 

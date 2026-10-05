@@ -59,7 +59,8 @@
                                 <input type="checkbox" class="tl_checkbox" name="targets[]" id="st_target_{{ root.id }}" value="{{ root.id }}"{% if root.id in selected or (selected is empty and report is null) %} checked{% endif %}>
                                 <label for="st_target_{{ root.id }}" class="tl_checkbox_label">
                                     {{ root.title }} <span class="label-info">[{{ root.language }}]</span>
-                                    {% if root.targetPageId %}— {{ 'MSC.supertext.exists'|trans }}{% else %}— {{ 'MSC.supertext.new'|trans }}{% endif %}
+                                    {# For a website root the target is the other root, which always exists. #}
+                                    {% if page.type != 'root' %}{% if root.targetPageId %}— {{ 'MSC.supertext.exists'|trans }}{% else %}— {{ 'MSC.supertext.new'|trans }}{% endif %}{% endif %}
                                 </label>
                                 <br>
                             {% endfor %}
@@ -75,7 +76,9 @@
                             </div>
                         </div>
                     {% elseif page.type == 'root' %}
-                        <p class="tl_help" style="white-space: normal">{{ 'MSC.supertext.rootHelp'|trans }}</p>
+                        <div class="widget">
+                            <p class="tl_help" style="white-space: normal">{{ 'MSC.supertext.rootHelp'|trans }}</p>
+                        </div>
                     {% endif %}
                 {% endif %}
             </div>

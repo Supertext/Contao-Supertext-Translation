@@ -8,6 +8,12 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 - Requests that hit Supertext's per-second rate limit (HTTP 429), e.g. when translating into several languages, are retried up to 4 times instead of failing that language.
 - The API key works with or without the `Supertext-Auth-Key ` prefix Supertext shows.
+- Translating a website root no longer labels every language "translation exists, will be updated" (the other roots always exist); the note under the form is aligned with the form.
+- Demo: editors could not publish the translated pages (*Publish page* was missing). The Editors group now gets every page, article and content element field; an existing group gets the missing ones on the next start.
+
+### Changed
+
+- Documentation screenshots show real German, French and Italian: made by `test/docs/screenshots.mjs` from the demo against a stand-in API, at 1×; new images for the retranslate warning, the translated site structure, the website after publishing and the language settings of a website root.
 
 ### Added
 

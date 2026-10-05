@@ -4,3 +4,4 @@
 /.phpunit.result.cache
 .env
 .env.local
+/test/docs/node_modules/

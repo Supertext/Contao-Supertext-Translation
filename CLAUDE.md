@@ -50,5 +50,5 @@ Lessons from testing against the live API (October 2026), to apply in every plug
 - Unit tests: `vendor/bin/phpunit --testsuite unit`. Integration tests run inside a real Contao installation with a database (see `docs/DEVELOPER.md`); CI runs them for Contao 5.7 and 6.0. Unit and integration tests must pass before committing.
 - Support both Contao 5.7 and 6.0: check APIs in both versions (e.g. plain text is stored encoded in 5.7, raw in 6.0 — see "Text encoding" in `docs/DEVELOPER.md`). Never write Contao 4 conventions (e.g. `published = ''`; flags are booleans).
 - New settings go in `SupertextTranslationBundle::configure()` **and** the settings table in `docs/INSTALLATION.md`. Translated fields live in `src/Translation/FieldMap.php`; keep the field table in the installation guide in sync.
-- UI changes: update the screenshots in `docs/images/` (taken from the demo with a headless browser, logged in as the demo editor).
+- UI changes: regenerate `docs/images/` with `test/docs/screenshots.mjs` against a fresh demo and the stand-in API (see "Docs screenshots" in `docs/DEVELOPER.md`); new demo content needs entries in `test/docs/translations.json`.
 - `demo/` is the Railway demo (Dockerfile `demo/Dockerfile`, context = repo root). The demo setup command must stay idempotent. Demo secrets live only in Railway variables.

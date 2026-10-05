@@ -2,7 +2,7 @@
 
 AI translation for [Contao](https://contao.org) 5.7 and 6.0 by [Supertext](https://www.supertext.com). Adds a **Translate with Supertext** action to the site structure: pick a page (or a whole website root) and the languages, and the bundle copies the pages with their articles and content elements into the other language roots and translates the texts. New pages are created unpublished for review; translating again updates them in place.
 
-![Site structure with the translate action](docs/images/01-site-structure.png)
+![Site structure after translating the English website into German, French and Italian with Supertext](docs/images/05-site-structure-translated.png)
 
 ```bash
 composer require supertext/contao-supertext-translation

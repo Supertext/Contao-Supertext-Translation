@@ -1,0 +1,13 @@
+{
+  "name": "contao-supertext-docs-screenshots",
+  "private": true,
+  "type": "module",
+  "description": "Regenerates docs/images from the demo (see docs/DEVELOPER.md)",
+  "scripts": {
+    "stand-in": "node stand-in.mjs",
+    "screenshots": "node screenshots.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.56.0"
+  }
+}
