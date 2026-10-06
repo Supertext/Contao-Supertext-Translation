@@ -8,6 +8,8 @@ AI translation for [Contao](https://contao.org) 5.7 and 6.0 by [Supertext](https
 composer require supertext/contao-supertext-translation
 ```
 
+You need a Supertext account ([create one](https://www.supertext.com/person/en/account/signin)) and an API key ([supertext.com → Integrations → API](https://www.supertext.com/en/integrations/api), requires the Admin role); set it as `SUPERTEXT_API_KEY` (see the [Installation guide](docs/INSTALLATION.md#api-key)).
+
 Formatting, links and insert tags are kept; translated pages are linked for the language switcher (terminal42/contao-changelanguage); previous versions stay restorable.
 
 **Live demo:** <https://contao-production.up.railway.app/contao> (credentials from the Supertext team)

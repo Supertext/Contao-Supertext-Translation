@@ -15,6 +15,7 @@
 
                 {% if not api_key_configured %}
                     <p class="tl_error">{{ 'MSC.supertext.noApiKey'|trans }}</p>
+                    <p class="tl_help tl_tip">{{ 'MSC.supertext.noApiKeyHelp'|trans|raw }}</p>
                 {% endif %}
 
                 {% if error %}

@@ -68,7 +68,7 @@ The new pages appear in each language's tree, unpublished (crossed-out eye):
 | *new, unpublished — review and publish it* | A new page was created; publish it when it's ready. |
 | *… element(s) no longer in the source were hidden* | Elements removed in the source were hidden in this language. |
 | *… text(s) came back empty from Supertext and kept the source text* | Check those texts in the translated page. |
-| *No Supertext API key is configured* | Ask your administrator. |
+| *No Supertext API key is configured* | Ask your administrator; the message links to the Supertext account signup and API key pages for them. |
 | *There is no other language of this website you may edit* | Ask your administrator to create the language roots or give you access. |
 | *Authentication failure* / *limit is exceeded* | Supertext account problem; ask your administrator. |
 | *Timed out waiting…* | Try again, or translate fewer pages at once. |

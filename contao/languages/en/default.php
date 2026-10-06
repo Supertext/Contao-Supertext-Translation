@@ -18,5 +18,6 @@ $GLOBALS['TL_LANG']['MSC']['supertext'] = [
     'missing' => '%s text(s) came back empty from Supertext and kept the source text. Please review.',
     'noTarget' => 'Please choose at least one language.',
     'noApiKey' => 'No Supertext API key is configured. Ask your administrator to set SUPERTEXT_API_KEY.',
+    'noApiKeyHelp' => 'No Supertext account yet? <a href="https://www.supertext.com/person/en/account/signin" target="_blank" rel="noopener">Create one at supertext.com</a>. Generate your API key at <a href="https://www.supertext.com/en/integrations/api" target="_blank" rel="noopener">supertext.com → Integrations → API</a> (requires the Admin role).',
     'noRoots' => 'There is no other language of this website you may edit. Create a website root for each language first (Site structure → new page of type “Website root” with its own language).',
 ];

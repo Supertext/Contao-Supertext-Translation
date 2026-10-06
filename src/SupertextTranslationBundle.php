@@ -14,6 +14,10 @@ use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 /**
  * Configuration (config/config.yaml of the Contao installation):
  *
+ * API key: create a Supertext account at https://www.supertext.com/person/en/account/signin
+ * and generate the key at https://www.supertext.com/en/integrations/api
+ * (supertext.com → Integrations → API, requires the Admin role).
+ *
  *     supertext_translation:
  *         api_key: '%env(SUPERTEXT_API_KEY)%'   # default
  *         environment: live                     # live | staging | testing (env var OK)

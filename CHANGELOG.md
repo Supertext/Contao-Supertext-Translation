@@ -13,6 +13,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Changed
 
+- When no API key is configured, the translate screen links to the Supertext account signup and to supertext.com → Integrations → API to generate a key (Admin role required); the installation guide, README and demo `.env.example` explain the same.
 - Documentation screenshots show real German, French and Italian: made by `test/docs/screenshots.mjs` from the demo against a stand-in API, at 1×; new images for the retranslate warning, the translated site structure, the website after publishing and the language settings of a website root.
 
 ### Added

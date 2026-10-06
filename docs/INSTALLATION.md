@@ -10,7 +10,7 @@ For administrators who set up a Contao installation. Editors: see the [User guid
 | PHP | 8.3 or newer (Contao 6 needs 8.4) |
 | Database | MySQL 8.0/8.4 or MariaDB 10.11+ (as required by Contao; MySQL 9 is not supported by Contao) |
 | Multilingual site | One **website root per language** in the site structure, each with its own *Language* setting (e.g. `en`, `de-CH`, `fr-CH`) |
-| Supertext | An API key with access to AI translation (<https://www.supertext.com/en/integrations/api>) |
+| Supertext | A Supertext account and an API key with access to AI translation (see [API key](#api-key)) |
 
 The server must reach `https://api.supertext.com` over HTTPS.
 
@@ -38,6 +38,9 @@ The database update adds a few columns (`supertext_source` on pages, articles an
 
 ## API key
 
+1. No Supertext account yet? Create one at <https://www.supertext.com/person/en/account/signin> (log in or create a Supertext account with your e-mail address).
+2. Generate your API key at <https://www.supertext.com/en/integrations/api> (supertext.com → *Integrations* → *API*). This requires the **Admin** role in your Supertext account; otherwise ask your Supertext account admin for a key.
+
 Set the key as an environment variable of the web server, or in the `.env.local` file of your Contao installation (never commit it):
 
 ```bash
@@ -46,7 +49,7 @@ SUPERTEXT_API_KEY=your-key-here
 
 The key works with or without the `Supertext-Auth-Key ` prefix that Supertext shows.
 
-Without a key, the translate screen shows "No Supertext API key is configured" and the *Translate* button is disabled.
+Without a key, the translate screen shows "No Supertext API key is configured" with the two links above, and the *Translate* button is disabled.
 
 ## Permissions
 
@@ -130,8 +133,8 @@ Remove the package (Contao Manager or `composer remove supertext/contao-supertex
 | --- | --- |
 | No translate icon in the site structure | The user lacks the Supertext permission (user group → Supertext), or the database update wasn't run. |
 | "There is no other language of this website you may edit" | No other website root with a different language and the same domain, or the user can't edit those roots (pagemounts, page permissions). |
-| "No Supertext API key is configured" | Set `SUPERTEXT_API_KEY` and clear the cache. |
-| "Authentication failure" | Wrong key, or a key for another environment (`live` vs `staging`). |
+| "No Supertext API key is configured" | Set `SUPERTEXT_API_KEY` and clear the cache. No key yet: see [API key](#api-key). |
+| "Authentication failure" | Wrong key, or a key for another environment (`live` vs `staging`). Generate a new key at <https://www.supertext.com/en/integrations/api> (Admin role required). |
 | "Too many requests to Supertext" | Supertext's per-second rate limit. Each request is retried up to 4 times automatically; if it still appears, translate fewer languages at once and try again. |
 | "Your Supertext translation limit is exceeded" | The Supertext subscription quota is used up. |
 | `INVALID_LANGUAGE_PAIR` in the error | A root's language isn't a code Supertext knows; add a `language_map` entry. |
