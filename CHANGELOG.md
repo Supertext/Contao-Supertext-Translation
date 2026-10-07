@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-07
+
 ### Fixed
 
 - Requests that hit Supertext's per-second rate limit (HTTP 429), e.g. when translating into several languages, are retried up to 4 times instead of failing that language.
