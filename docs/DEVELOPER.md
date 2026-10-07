@@ -166,10 +166,13 @@ The editor translates the English website, opens the translate screen again (ret
 
 ## Releasing
 
-1. Move *Unreleased* in `CHANGELOG.md` under a new version.
-2. Tag `vX.Y.Z` and push the tag.
-3. Packagist (once registered) picks up the tag; until then installs use the VCS repository.
+Releases are published by `.github/workflows/release.yml` when the version is officially bumped; nobody tags or creates releases by hand.
 
+1. Move the *Unreleased* entries in `CHANGELOG.md` under a new `## [X.Y.Z] - YYYY-MM-DD` section, and keep an empty *Unreleased* above it.
+2. There is no version field to change: Composer takes the version from the Git tag the workflow creates.
+3. Push to `main`. The workflow tags `vX.Y.Z` and creates the GitHub release with the CHANGELOG section as notes (0.x versions as pre-releases). A push that adds no new version does nothing, and a version that is already released is skipped. After fixing a failed run, start it again with *Run workflow* on the *Release* workflow.
+
+Packagist (once registered) picks up the tag; until then installs use the VCS repository.
 ## Known limitations / roadmap
 
 - Runs in the request (like the WordPress plugin). Next: Contao's job queue (5.7+, `@experimental`) for whole-site translations with progress.
