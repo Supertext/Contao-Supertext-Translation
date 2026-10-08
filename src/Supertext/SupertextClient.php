@@ -218,7 +218,7 @@ class SupertextClient
                 $response = $this->httpClient->request($method, $this->baseUrl.$path, $options);
                 $status = $response->getStatusCode();
             } catch (TransportExceptionInterface $e) {
-                throw new SupertextException('transport_error', 'Could not reach Supertext: '.$e->getMessage(), null, $e);
+                throw new SupertextException('transport_error', 'Could not reach Supertext: '.$e->getMessage(), null, $e, $e->getMessage());
             }
 
             if (429 !== $status || $attempt >= self::RATE_LIMIT_RETRIES) {

@@ -63,6 +63,8 @@ The new pages appear in each language's tree, unpublished (crossed-out eye):
 
 ## Messages
 
+The translate screen and its messages appear in your back-end language (English, German, French or Italian; set in your profile). The table lists the English wording.
+
 | Message | Meaning |
 | --- | --- |
 | *new, unpublished — review and publish it* | A new page was created; publish it when it's ready. |
@@ -72,5 +74,6 @@ The new pages appear in each language's tree, unpublished (crossed-out eye):
 | *There is no other language of this website you may edit* | Ask your administrator to create the language roots or give you access. |
 | *Authentication failure* / *limit is exceeded* | Supertext account problem; ask your administrator. |
 | *Timed out waiting…* | Try again, or translate fewer pages at once. |
+| *The parent of page … has no translation* | Translate the parent page into that language first (or tick *Also translate all subpages* on the parent). |
 
 If you don't see the translate icon, you don't have the Supertext permission. Ask your administrator.

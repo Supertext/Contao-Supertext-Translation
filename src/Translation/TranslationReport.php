@@ -15,12 +15,14 @@ final class TranslationReport
      *     ok: bool,
      *     error: string|null,
      *     errorCode: string|null,
+     *     errorParams: list<string|int>,
+     *     errorDetail: string,
      *     pages: list<array{id: int, title: string, created: bool}>,
      *     articles: int,
      *     elements: int,
      *     hidden: int,
      *     missing: list<string>,
-     *     warnings: list<string>,
+     *     warnings: list<array{0: string, 1: list<string>}>,
      * }>
      */
     public array $targets = [];
@@ -32,6 +34,8 @@ final class TranslationReport
             'ok' => true,
             'error' => null,
             'errorCode' => null,
+            'errorParams' => [],
+            'errorDetail' => '',
             'pages' => [],
             'articles' => 0,
             'elements' => 0,
@@ -41,11 +45,25 @@ final class TranslationReport
         ];
     }
 
-    public function fail(int $rootId, string $message, string|null $code = null): void
+    /**
+     * `$message` is English (logs); the back end shows `MSC.supertext.error_<code>`
+     * with `$params`, followed by the untranslated `$detail`.
+     *
+     * @param list<string|int> $params
+     */
+    public function fail(int $rootId, string $message, string|null $code = null, array $params = [], string $detail = ''): void
     {
         $this->targets[$rootId]['ok'] = false;
         $this->targets[$rootId]['error'] = $message;
         $this->targets[$rootId]['errorCode'] = $code;
+        $this->targets[$rootId]['errorParams'] = $params;
+        $this->targets[$rootId]['errorDetail'] = $detail;
+    }
+
+    /** @param list<string> $params */
+    public function warn(int $rootId, string $key, array $params = []): void
+    {
+        $this->targets[$rootId]['warnings'][] = [$key, $params];
     }
 
     public function hasErrors(): bool

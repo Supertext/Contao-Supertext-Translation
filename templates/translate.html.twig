@@ -42,10 +42,18 @@
                                 <p class="tl_info">{{ 'MSC.supertext.missing'|trans([target.missing|length]) }}</p>
                             {% endif %}
                             {% for warning in target.warnings %}
-                                <p class="tl_info">{{ warning }}</p>
+                                <p class="tl_info">{{ warning[0]|trans(warning[1]) }}</p>
                             {% endfor %}
                         {% else %}
-                            <p class="tl_error"><strong>{{ target.root.title }} ({{ target.root.language }})</strong>: {{ target.error }}</p>
+                            {# Known errors are shown in the user's language, others as they are (English). #}
+                            {% set error_key = 'MSC.supertext.error_' ~ target.errorCode %}
+                            {% set error_message = target.errorCode ? error_key|trans(target.errorParams) : error_key %}
+                            <p class="tl_error"><strong>{{ target.root.title }} ({{ target.root.language }})</strong>:
+                                {% if error_message == error_key %}{{ target.error }}{% else %}{{ error_message }}{% if target.errorDetail %} — {{ target.errorDetail }}{% endif %}{% endif %}
+                            </p>
+                            {% if target.errorCode in ['authentication_failure', 'missing_api_key'] %}
+                                <p class="tl_help tl_tip">{{ 'MSC.supertext.noApiKeyHelp'|trans|raw }}</p>
+                            {% endif %}
                         {% endif %}
                     {% endfor %}
                 {% endif %}
