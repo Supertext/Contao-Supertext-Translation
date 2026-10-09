@@ -51,6 +51,7 @@ final class Protector
      *
      * @param list<int> $expected  placeholder indexes the value should contain
      * @param list<int> $missing   receives the indexes of tokens that did not come back
+     * @param-out list<int> $missing
      */
     public function restore(string $value, array $expected = [], array|null &$missing = null): string
     {

@@ -42,10 +42,16 @@ Every Supertext plugin repo has, and a new one gets from the start:
 - `LICENSE` matching the license its manifest declares (`composer.json`, `package.json`, `pyproject.toml`, `.csproj`, plugin header).
 - `SECURITY.md`: report vulnerabilities privately through GitHub's private vulnerability reporting or support@supertext.com, never in public issues.
 - `.github/dependabot.yml`: weekly updates for its package ecosystem and GitHub Actions, minor and patch updates grouped into one pull request.
-- On GitHub: the About box filled in (one-sentence description, website https://www.supertext.com, topics), `main` protected against force-pushes and deletion, Wiki and Projects off, Dependabot alerts and private vulnerability reporting on, and the Supertext social preview image.
+- `.github/workflows/checks.yml` (actionlint + zizmor on every push and PR, dependency review on PRs) and `.github/workflows/links.yml` (lychee weekly and on docs changes; broken links open the issue "Broken links in the docs"). Third-party actions are pinned to commit SHAs.
+- PHP repos: PHPStan in CI (`phpstan.neon`, baseline in `phpstan-baseline.neon`).
+- On GitHub: the About box filled in (one-sentence description, website https://www.supertext.com, topics), `main` protected against force-pushes and deletion, Wiki and Projects off, Dependabot alerts and private vulnerability reporting on, secret scanning with push protection and CodeQL default setup on, and the Supertext social preview image.
 - A row in the plugin list (see *Plugin list*) and in the org profile (`Supertext/.github` → `profile/README.md`).
 
 Claude sessions can't change GitHub repo settings (HTTP 403): add a new repo to Remy's setup script (`set-github-about`) instead of trying.
+
+## Checks and alerts (always)
+
+Before starting work in a repo, look at its open findings and fix what the task touches or what is quick: code scanning alerts (`gh api 'repos/Supertext/Contao-Supertext-Translation/code-scanning/alerts?state=open'`), secret scanning alerts (`…/secret-scanning/alerts?state=open`), open Dependabot PRs and the issue "Broken links in the docs". New workflows and workflow changes must pass actionlint and zizmor; PHP code must pass PHPStan at the repo's level. See `docs/DEVELOPER.md` → *Code quality and security checks*.
 
 ## Demo accounts rule (always)
 
@@ -80,7 +86,7 @@ Lessons from testing against the live API (October 2026), to apply in every plug
 
 ## This repo
 
-- Unit tests: `vendor/bin/phpunit --testsuite unit`. Integration tests run inside a real Contao installation with a database (see `docs/DEVELOPER.md`); CI runs them for Contao 5.7 and 6.0. Unit and integration tests must pass before committing.
+- Unit tests: `vendor/bin/phpunit --testsuite unit`. Integration tests run inside a real Contao installation with a database (see `docs/DEVELOPER.md`); CI runs them for Contao 5.7 and 6.0. Unit and integration tests and PHPStan (`vendor/bin/phpstan analyse`) must pass before committing.
 - Support both Contao 5.7 and 6.0: check APIs in both versions (e.g. plain text is stored encoded in 5.7, raw in 6.0 — see "Text encoding" in `docs/DEVELOPER.md`). Never write Contao 4 conventions (e.g. `published = ''`; flags are booleans).
 - New settings go in `SupertextTranslationBundle::configure()` **and** the settings table in `docs/INSTALLATION.md`. Translated fields live in `src/Translation/FieldMap.php`; keep the field table in the installation guide in sync.
 - UI changes: regenerate `docs/images/` with `test/docs/screenshots.mjs` against a fresh demo and the stand-in API (see "Docs screenshots" in `docs/DEVELOPER.md`); new demo content needs entries in `test/docs/translations.json`.

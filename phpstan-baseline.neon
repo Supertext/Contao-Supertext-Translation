@@ -1,0 +1,30 @@
+parameters:
+	ignoreErrors:
+		-
+			# DBAL 3 has no quoteSingleIdentifier(); PHPStan runs against DBAL 4.
+			message: '#^Call to function method_exists\(\) with Doctrine\\DBAL\\Connection and ''quoteSingleIdentifier'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: src/Translation/PageTranslator.php
+		-
+			# Contao 5.7's entity cache tags service; optional (nullOnInvalid) and absent in the Contao 6 that PHPStan runs against.
+			message: '#^Call to method invalidateTagsFor\(\) on an unknown class Contao\\CoreBundle\\Cache\\EntityCacheTags\.$#'
+			identifier: class.notFound
+			count: 1
+			path: src/Translation/ContaoHooks.php
+		-
+			message: '#^Parameter \$cacheTags of method Supertext\\ContaoTranslation\\Translation\\ContaoHooks\:\:__construct\(\) has invalid type Contao\\CoreBundle\\Cache\\EntityCacheTags\.$#'
+			identifier: class.notFound
+			count: 1
+			path: src/Translation/ContaoHooks.php
+		-
+			message: '#^Property Supertext\\ContaoTranslation\\Translation\\ContaoHooks\:\:\$cacheTags has unknown class Contao\\CoreBundle\\Cache\\EntityCacheTags as its type\.$#'
+			identifier: class.notFound
+			count: 1
+			path: src/Translation/ContaoHooks.php
+		-
+			# Group 1 is '' when the alternative (group 2) matched; PHPStan infers it as always non-empty.
+			message: '#^Strict comparison using \!\=\= between '''' and numeric\-string will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: src/Html/Protector.php
