@@ -1,0 +1,6 @@
+# PHPStan: see docs/DEVELOPER.md → Code quality and security checks.
+# Run with `composer install && vendor/bin/phpstan analyse` (Contao is a regular dependency).
+parameters:
+    level: 5
+    paths:
+        - src
