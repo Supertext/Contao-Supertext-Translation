@@ -18,7 +18,7 @@ src/
   Html/FieldCodec.php              field value ⇄ segments (text, html, inputUnit, list, table)
   Supertext/SupertextClient.php    Supertext AI file API v1 (Symfony HttpClient)
 contao/dca/                        new columns, page operation, permission field
-contao/languages/{en,de}/          labels
+contao/languages/{en,de,fr,it}/    back-end strings (screen, permission, messages)
 templates/translate.html.twig      back-end screen (@SupertextTranslation)
 public/supertext.svg               operation icon (bundles/supertexttranslation/)
 config/services.php, routes.yaml
@@ -60,6 +60,10 @@ Contao 6 stores plain-text fields **as typed**. Contao 5.7 encodes them on input
 - Insert tags (`{{…}}`, one nesting level) and basic entities (`[nbsp]`, `[-]`, …) are protected: in text as `<span translate="no" data-st-ph="N">N</span>`, inside tags/attributes as the marker `st-ph-N`. A placeholder the translator drops is appended to the end of the value and reported as a warning.
 - Parsing uses `DOMDocument` (`<?xml encoding="utf-8">` hint); segments missing in the response keep the source text and are reported.
 - Serialized values are unserialized with `allowed_classes: false`.
+
+### Interface strings
+
+All back-end strings are Contao language files in `contao/languages/{en,de,fr,it}/` (`default.php` → `MSC.supertext.*`, plus the permission labels in `tl_user`/`tl_user_group` and the page operation in `tl_page`), used in the template with `|trans` (domain `contao_default`). Errors keep an English message for the system log; the screen shows `MSC.supertext.error_<errorCode>` (`SupertextException::$errorCode`, `TranslationException::$errorCode`) with the report's `errorParams`, then the untranslated API detail. New or changed strings need all four languages in the same commit (formal Sie/vous/Lei, Contao's own terms, "Supertext", placeholders and URLs unchanged); `LanguageFilesTest` checks this.
 
 ## Supertext API protocol
 
@@ -107,6 +111,7 @@ The integration tests **empty** `tl_page`, `tl_article`, `tl_content` and `tl_ve
 
 - `tests/Unit/SupertextClientTest` — protocol, multipart fields, status/HTTP error mapping, timeout, runtime environment selection
 - `tests/Unit/SegmentDocumentTest` — HTML build/parse, umlauts, insert tags in text and attributes, lost placeholders, field codecs, text encodings of Contao 5 and 6, no object unserialization
+- `tests/Unit/LanguageFilesTest` — `contao/languages/{de,fr,it}` have the same keys, placeholders, HTML tags and URLs as `en`; every error code has an `MSC.supertext.error_<code>` message
 - `tests/Unit/ConfigurationTest` — config keys like `de-CH` are kept (Symfony would turn dashes into underscores)
 - `tests/Integration/PageTranslatorTest` — real Contao + database: translating into several roots, nested elements, insert tags, re-translation updates in place and hides removed elements, missing parents and whole trees, only roots of the same site, Supertext errors per language, field overrides
 

@@ -177,7 +177,7 @@ class PageTranslator
                     $this->languages->politeness((string) $root['language']),
                 );
             } catch (SupertextException $e) {
-                $report->fail($rootId, $e->getMessage(), $e->errorCode);
+                $report->fail($rootId, $e->getMessage(), $e->errorCode, [(string) $e->httpStatus], $e->detail);
             }
         }
 
@@ -191,7 +191,7 @@ class PageTranslator
                     $report->targets[$rootId]['missing'] = [...$report->targets[$rootId]['missing'], ...$parsed['missing']];
 
                     foreach ($parsed['lostPlaceholders'] as $key) {
-                        $report->targets[$rootId]['warnings'][] = \sprintf('Insert tags were moved to the end in "%s"; please check the position.', $key);
+                        $report->warn($rootId, 'MSC.supertext.insertTagsMoved', [$key]);
                     }
                 }
 
@@ -199,7 +199,9 @@ class PageTranslator
                     fn () => $this->write($page, $articles, $elements, $sourceRoot, $rootId, $translations, $report),
                 );
             } catch (SupertextException $e) {
-                $report->fail($rootId, $e->getMessage(), $e->errorCode);
+                $report->fail($rootId, $e->getMessage(), $e->errorCode, [(string) $e->httpStatus], $e->detail);
+            } catch (TranslationException $e) {
+                $report->fail($rootId, $e->getMessage(), $e->errorCode, $e->params);
             } catch (\Throwable $e) {
                 $report->fail($rootId, $e->getMessage());
             }
@@ -226,7 +228,7 @@ class PageTranslator
 
             if ($created) {
                 $parent = $this->findTargetPage((int) $page['pid'], $rootId)
-                    ?? throw new \RuntimeException(\sprintf('The parent of page "%s" has no translation.', $page['title']));
+                    ?? throw new TranslationException('parent_not_translated', \sprintf('The parent of page "%s" has no translation.', $page['title']), [(string) $page['title']]);
 
                 $row = $this->translatedRow('tl_page', 'p', $page, $tr);
                 $row['pid'] = $parent;

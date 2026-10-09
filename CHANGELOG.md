@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Added
+
+- French and Italian interface (and German where it was missing): the translate screen, the permission and all messages, including Supertext errors, follow the back-end user's language.
+
 ## [0.1.0] - 2026-10-07
 
 ### Fixed

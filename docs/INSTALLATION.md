@@ -62,6 +62,10 @@ Administrators can always translate. For other users:
 
 The *Translate with Supertext* icon only appears for users with the permission, and the translate screen only offers languages whose website root the user may edit.
 
+## Interface languages
+
+The bundle's screens, the permission and its messages are available in English, German, French and Italian. They follow each back-end user's language (user menu → *Profile* → *Back end language*); other languages fall back to English. This is independent of the website languages below.
+
 ## Language setup
 
 ![Settings of the German website root: Language de-CH, Language fallback off](images/07-language-root.png)

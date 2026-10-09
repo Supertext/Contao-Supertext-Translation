@@ -15,6 +15,8 @@ final class SupertextException extends \RuntimeException
         string $message,
         public readonly int|null $httpStatus = null,
         \Throwable|null $previous = null,
+        /** Untranslated detail (the API's answer or the transport error), also part of the message. */
+        public readonly string $detail = '',
     ) {
         parent::__construct($message, 0, $previous);
     }
@@ -32,6 +34,6 @@ final class SupertextException extends \RuntimeException
 
         $detail = mb_substr(trim(strip_tags($body)), 0, 200);
 
-        return new self($code, '' !== $detail ? $message.' — '.$detail : $message, $status);
+        return new self($code, '' !== $detail ? $message.' — '.$detail : $message, $status, null, $detail);
     }
 }
