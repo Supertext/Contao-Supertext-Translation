@@ -12,7 +12,7 @@ jobs:
       matrix:
         php: ['8.3', '8.4']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
@@ -46,7 +46,7 @@ jobs:
       COMPOSER_NO_INTERACTION: '1'
       CONTAO_TEST_DATABASE_URL: mysql://root:root@127.0.0.1:3306/contao_test?serverVersion=8.4.0&charset=utf8mb4
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: bundle
       - uses: shivammathur/setup-php@v2
