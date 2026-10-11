@@ -27,12 +27,15 @@ composer require supertext/contao-supertext-translation
 vendor/bin/contao-console contao:migrate
 ```
 
-Until the package is published on Packagist, add the GitHub repository first:
+Until the bundle and the [Supertext SDK](https://github.com/Supertext/Supertext-API-SDK-and-Guide) it uses (`supertext/supertext-sdk`) are published on Packagist, add both GitHub repositories first:
 
 ```bash
 composer config repositories.supertext vcs https://github.com/Supertext/Contao-Supertext-Translation
-composer require supertext/contao-supertext-translation:dev-main
+composer config repositories.supertext-sdk '{"type": "vcs", "url": "https://github.com/Supertext/Supertext-API-SDK-and-Guide", "no-api": true}'
+composer require supertext/supertext-sdk:dev-main supertext/contao-supertext-translation:dev-main
 ```
+
+`supertext/supertext-sdk:dev-main` is required explicitly because it has no release yet (Composer only installs development versions of packages the project itself asks for). The Contao Manager can't add repositories; until then, use Composer on the command line.
 
 The database update adds a few columns (`supertext_source` on pages, articles and content elements, and the `supertext` permission on users and user groups). No existing data is changed.
 

@@ -7,10 +7,12 @@
         "contao/conflicts": "@dev",
         "contao/manager-bundle": "6.0.*",
         "supertext/contao-supertext-translation": "@dev",
+        "supertext/supertext-sdk": "dev-main",
         "terminal42/contao-changelanguage": "^3.9"
     },
     "repositories": [
-        { "type": "path", "url": "plugin", "options": { "symlink": false } }
+        { "type": "path", "url": "plugin", "options": { "symlink": false } },
+        { "type": "vcs", "url": "https://github.com/Supertext/Supertext-API-SDK-and-Guide", "no-api": true }
     ],
     "autoload": {
         "psr-4": { "App\\": "src/" }
@@ -29,7 +31,11 @@
         "contao-component-dir": "assets"
     },
     "scripts": {
-        "post-install-cmd": ["@php vendor/bin/contao-setup"],
-        "post-update-cmd": ["@php vendor/bin/contao-setup"]
+        "post-install-cmd": [
+            "@php vendor/bin/contao-setup"
+        ],
+        "post-update-cmd": [
+            "@php vendor/bin/contao-setup"
+        ]
     }
 }

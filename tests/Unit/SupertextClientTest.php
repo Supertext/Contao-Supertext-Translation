@@ -82,8 +82,42 @@ final class SupertextClientTest extends TestCase
     public function testTimesOut(): void
     {
         $fake = new FakeSupertext(['translating']);
-        $this->expectExceptionObject(new SupertextException('timeout', 'Timed out waiting for the Supertext translation to finish.'));
-        $this->client($fake, timeoutMs: 5000)->translateHtml('x', 'en-US');
+
+        try {
+            $this->client($fake, timeoutMs: 5000)->translateHtml('x', 'en-US');
+            $this->fail('Expected a timeout.');
+        } catch (SupertextException $e) {
+            $this->assertSame('timeout', $e->errorCode);
+        }
+
+        // Polled at 0, 1, … 5 s (simulated time), then the file is deleted.
+        $this->assertCount(6, $fake->calls(static fn ($c) => str_ends_with($c['url'], '/status')));
+        $this->assertCount(1, $fake->calls(static fn ($c) => 'DELETE' === $c['method']));
+    }
+
+    public function testBareTargetGetsARegion(): void
+    {
+        $fake = new FakeSupertext();
+        $this->client($fake)->translateHtml('<div data-st-id="a">Hallo</div>', 'de', 'en-GB');
+
+        $parts = FakeSupertext::parseMultipart($fake->calls[0]['body']);
+        $this->assertSame('de-DE', $parts['target_lang']['body']);
+        $this->assertSame('en', $parts['source_lang']['body']);
+    }
+
+    public function testRejectedLanguagePairKeepsTheApiCode(): void
+    {
+        $fake = new FakeSupertext(failStatus: 400);
+        $fake->failBody = '{"error_code":"INVALID_LANGUAGE_PAIR","message":"Unsupported language pair"}';
+
+        try {
+            $this->client($fake)->translateHtml('x', 'xx-XX', 'en');
+            $this->fail('Expected an exception.');
+        } catch (SupertextException $e) {
+            $this->assertSame('invalid_language_pair', $e->errorCode);
+            $this->assertSame(400, $e->httpStatus);
+            $this->assertStringStartsWith('INVALID_LANGUAGE_PAIR', $e->detail);
+        }
     }
 
     public static function httpProvider(): iterable

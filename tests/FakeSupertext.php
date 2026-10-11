@@ -24,6 +24,9 @@ final class FakeSupertext
     /** Answer this many requests with HTTP 429 (rate limit) first. */
     public int $rateLimited = 0;
 
+    /** Body sent with `$failStatus`. */
+    public string $failBody = 'nope';
+
     /** @var list<array{html: string, target: string, source: string, politeness: string, type: string}> every uploaded file */
     public array $submitted = [];
 
@@ -103,7 +106,7 @@ final class FakeSupertext
         }
 
         if ($this->failStatus) {
-            return new MockResponse('nope', ['http_code' => $this->failStatus]);
+            return new MockResponse($this->failBody, ['http_code' => $this->failStatus]);
         }
 
         if ($this->rateLimited > 0) {

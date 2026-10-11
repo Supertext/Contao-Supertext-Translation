@@ -88,6 +88,7 @@ Lessons from testing against the live API (October 2026), to apply in every plug
 ## This repo
 
 - Unit tests: `vendor/bin/phpunit --testsuite unit`. Integration tests run inside a real Contao installation with a database (see `docs/DEVELOPER.md`); CI runs them for Contao 5.7 and 6.0. Unit and integration tests and PHPStan (`vendor/bin/phpstan analyse`) must pass before committing.
+- The Supertext API is used through the Supertext SDK (`supertext/supertext-sdk`, wrapped by `src/Supertext/SupertextClient.php`): protocol fixes belong in the SDK repo (Supertext/Supertext-API-SDK-and-Guide), not here. Until it is on Packagist it comes from its GitHub repository (`composer.json`, `demo/composer.json`, CI).
 - Support both Contao 5.7 and 6.0: check APIs in both versions (e.g. plain text is stored encoded in 5.7, raw in 6.0 — see "Text encoding" in `docs/DEVELOPER.md`). Never write Contao 4 conventions (e.g. `published = ''`; flags are booleans).
 - New settings go in `SupertextTranslationBundle::configure()` **and** the settings table in `docs/INSTALLATION.md`. Translated fields live in `src/Translation/FieldMap.php`; keep the field table in the installation guide in sync.
 - UI changes: regenerate `docs/images/` with `test/docs/screenshots.mjs` against a fresh demo and the stand-in API (see "Docs screenshots" in `docs/DEVELOPER.md`); new demo content needs entries in `test/docs/translations.json`.

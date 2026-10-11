@@ -4,47 +4,77 @@ declare(strict_types=1);
 
 namespace Supertext\ContaoTranslation\Supertext;
 
-use Symfony\Component\Mime\Part\DataPart;
-use Symfony\Component\Mime\Part\Multipart\FormDataPart;
-use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
+use Supertext\Sdk\Client;
+use Supertext\Sdk\Supertext;
+use Supertext\Sdk\SupertextException as SdkException;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
-use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
- * Supertext AI file translation API (v1), same protocol as the WordPress and Payload
- * plugins:
+ * The bundle's access to the Supertext AI file translation API (v1), built on the
+ * Supertext SDK (supertext/supertext-sdk), which handles the auth header, language
+ * codes, the multipart upload, HTTP 429 retries, polling and deleting the file:
  *
  *   1. POST   translate/ai/file                   multipart HTML upload → { file_id }
  *   2. GET    translate/ai/file/{id}/status       poll until `done`
  *   3. GET    translate/ai/file/{id}/translation  translated HTML
- *   4. DELETE translate/ai/file/{id}              best-effort cleanup (expires after 24 h)
+ *   4. DELETE translate/ai/file/{id}              always, also after errors
  *
- * Several documents can be submitted first and awaited afterwards, so translations into
- * several languages are processed by Supertext in parallel.
+ * Several documents can be submitted first and collected afterwards, so translations
+ * into several languages are processed by Supertext in parallel. Requests go through
+ * Symfony's HTTP client (SymfonyHttpTransport). SDK errors become this bundle's
+ * SupertextException with the same `errorCode`.
  */
 class SupertextClient
 {
     public const ENVIRONMENTS = [
-        'live' => 'https://api.supertext.com/v1/',
+        'live' => Supertext::LIVE_BASE_URL,
         'staging' => 'https://api.staging.supertext.com/v1/',
         'testing' => 'https://api.testing.supertext.com/v1/',
     ];
 
-    private readonly string $baseUrl;
+    /** Retries after HTTP 429 (done by the SDK). */
+    public const RATE_LIMIT_RETRIES = Supertext::DEFAULT_MAX_RETRIES;
 
-    /** @var \Closure(int): void */
-    private readonly \Closure $sleep;
+    private const USER_AGENT = 'Contao-Supertext-Translation';
 
+    private readonly Client $client;
+
+    /**
+     * @param (\Closure(int): void)|null $sleep Tests: replaces waiting (milliseconds); time
+     *                                         then only advances through these calls
+     */
     public function __construct(
-        private readonly HttpClientInterface $httpClient,
-        private readonly string $apiKey,
+        HttpClientInterface $httpClient,
+        #[\SensitiveParameter] private readonly string $apiKey,
         string $baseUrl = self::ENVIRONMENTS['live'],
-        private readonly int $pollIntervalMs = 2000,
-        private readonly int $timeoutMs = 180_000,
+        int $pollIntervalMs = 2000,
+        int $timeoutMs = 180_000,
         \Closure|null $sleep = null,
     ) {
-        $this->baseUrl = rtrim($baseUrl, '/').'/';
-        $this->sleep = $sleep ?? static fn (int $ms) => usleep($ms * 1000);
+        $clock = null;
+        $sdkSleep = null;
+
+        if (null !== $sleep) {
+            $elapsed = 0.0;
+            $sdkSleep = static function (float $seconds) use ($sleep, &$elapsed): void {
+                $elapsed += $seconds;
+                $sleep((int) round($seconds * 1000));
+            };
+            $clock = static function () use (&$elapsed): float {
+                return $elapsed;
+            };
+        }
+
+        $this->client = new Client(
+            $apiKey,
+            baseUrl: $baseUrl,
+            pollInterval: $pollIntervalMs / 1000,
+            timeout: $timeoutMs / 1000,
+            userAgent: self::USER_AGENT,
+            transport: new SymfonyHttpTransport($httpClient),
+            sleep: $sdkSleep,
+            clock: $clock,
+        );
     }
 
     /**
@@ -54,7 +84,7 @@ class SupertextClient
      */
     public static function create(
         HttpClientInterface $httpClient,
-        string|null $apiKey,
+        #[\SensitiveParameter] string|null $apiKey,
         string|null $apiUrl,
         string|null $environment,
         int $pollIntervalMs = 2000,
@@ -73,7 +103,7 @@ class SupertextClient
 
     public function hasApiKey(): bool
     {
-        return '' !== $this->apiKey;
+        return '' !== trim((string) preg_replace('/^\s*Supertext-Auth-Key(?:\s+|$)/i', '', $this->apiKey));
     }
 
     /**
@@ -83,47 +113,18 @@ class SupertextClient
      */
     public function translateHtml(string $html, string $targetLang, string $sourceLang = '', string $politeness = 'default'): string
     {
-        $fileId = $this->submit($html, $targetLang, $sourceLang, $politeness);
-
-        return $this->collect($fileId);
+        return $this->collect($this->submit($html, $targetLang, $sourceLang, $politeness));
     }
 
     /**
-     * Uploads a document and returns the file id.
+     * Uploads a document and returns the file id. The SDK sends the target with a region
+     * (`de` → `de-DE`) and the source as a bare language (`de-CH` → `de`).
      *
      * @param 'default'|'less'|'more' $politeness
      */
     public function submit(string $html, string $targetLang, string $sourceLang = '', string $politeness = 'default'): string
     {
-        $fields = ['target_lang' => $targetLang];
-
-        if ('' !== $sourceLang) {
-            $fields['source_lang'] = $sourceLang;
-        }
-
-        if ('default' !== $politeness) {
-            $fields['politeness'] = $politeness;
-        }
-
-        // Supertext matches the part's Content-Type against an allow-list verbatim: it
-        // must be exactly "text/html" (a charset suffix is rejected with 415). The
-        // document declares UTF-8 via <meta charset>.
-        $fields['file'] = new DataPart($html, 'content.html', 'text/html');
-        $form = new FormDataPart($fields);
-
-        $response = $this->request('POST', 'translate/ai/file', [
-            'headers' => $form->getPreparedHeaders()->toArray(),
-            // A string, not an iterable: a request retried after HTTP 429 sends it again.
-            'body' => $form->bodyToString(),
-        ]);
-
-        $data = json_decode($response->getContent(false), true);
-
-        if (!\is_array($data) || !\is_string($data['file_id'] ?? null) || '' === $data['file_id']) {
-            throw new SupertextException('no_file_id', 'Supertext did not return a file id.');
-        }
-
-        return $data['file_id'];
+        return $this->call(fn (): string => $this->client->submit($html, $targetLang, '' !== $sourceLang ? $sourceLang : null, $politeness));
     }
 
     /**
@@ -132,131 +133,53 @@ class SupertextClient
     public function collect(string $fileId): string
     {
         try {
-            $this->waitUntilDone($fileId);
+            return $this->call(function () use ($fileId): string {
+                $this->client->waitUntilDone($fileId);
 
-            return $this->download($fileId);
+                return $this->client->download($fileId);
+            });
         } finally {
-            $this->delete($fileId);
+            $this->client->delete($fileId);
         }
     }
 
     /** Cost-free check that the API key is accepted. */
     public function validateApiKey(): void
     {
-        $this->request('GET', 'features');
+        $this->call(fn (): null => $this->client->validateApiKey());
     }
 
-    private function waitUntilDone(string $fileId): void
-    {
-        $waited = 0;
-
-        while (true) {
-            $response = $this->request('GET', 'translate/ai/file/'.rawurlencode($fileId).'/status');
-            $data = json_decode($response->getContent(false), true);
-
-            switch (\is_array($data) ? ($data['status'] ?? null) : null) {
-                case 'done':
-                    return;
-
-                case 'error':
-                    throw new SupertextException('translation_error', 'Supertext failed to translate the document.');
-
-                case 'limit_exceeded':
-                    throw new SupertextException('quota_exceeded', 'Your Supertext translation limit is exceeded. Please upgrade your subscription.');
-
-                case 'deleted':
-                    throw new SupertextException('file_deleted', 'The Supertext translation file was deleted before it could be downloaded.');
-            }
-
-            // `translating` (or an unknown transient status): wait and retry.
-            if ($waited + $this->pollIntervalMs >= $this->timeoutMs) {
-                throw new SupertextException('timeout', 'Timed out waiting for the Supertext translation to finish.');
-            }
-
-            ($this->sleep)($this->pollIntervalMs);
-            $waited += $this->pollIntervalMs;
-        }
-    }
-
-    private function download(string $fileId): string
-    {
-        $body = $this->request('GET', 'translate/ai/file/'.rawurlencode($fileId).'/translation')->getContent(false);
-
-        if ('' === trim($body)) {
-            throw new SupertextException('incomplete_response', 'The translated document was empty.');
-        }
-
-        return $body;
-    }
-
-    private function delete(string $fileId): void
-    {
-        try {
-            $this->request('DELETE', 'translate/ai/file/'.rawurlencode($fileId));
-        } catch (SupertextException) {
-            // Best effort: files expire after 24 hours anyway.
-        }
-    }
-
-    private function request(string $method, string $path, array $options = []): ResponseInterface
-    {
-        if ('' === $this->apiKey) {
-            throw new SupertextException('missing_api_key', 'No Supertext API key is configured.');
-        }
-
-        $options['headers'] = [
-            ...($options['headers'] ?? []),
-            'Authorization: '.self::authHeader($this->apiKey),
-            'Accept: application/json',
-        ];
-        $options['timeout'] ??= 30;
-
-        // The API limits requests per second per key (HTTP 429), which translating into
-        // several languages at once can hit: wait and retry a few times.
-        for ($attempt = 0; ; ++$attempt) {
-            try {
-                $response = $this->httpClient->request($method, $this->baseUrl.$path, $options);
-                $status = $response->getStatusCode();
-            } catch (TransportExceptionInterface $e) {
-                throw new SupertextException('transport_error', 'Could not reach Supertext: '.$e->getMessage(), null, $e, $e->getMessage());
-            }
-
-            if (429 !== $status || $attempt >= self::RATE_LIMIT_RETRIES) {
-                break;
-            }
-
-            ($this->sleep)(self::retryDelayMs($attempt, $response->getHeaders(false)['retry-after'][0] ?? null));
-        }
-
-        if ($status < 200 || $status >= 300) {
-            throw SupertextException::fromStatus($status, $response->getContent(false));
-        }
-
-        return $response;
-    }
-
-    /** Retries after HTTP 429. */
-    public const RATE_LIMIT_RETRIES = 4;
-
-    /**
-     * Wait before retry `$attempt` (0-based): the Retry-After header (seconds) if present,
-     * else 1 s, 2 s, 4 s, 8 s plus up to 250 ms jitter.
-     */
+    /** Wait before retry `$attempt` after HTTP 429 (Retry-After, else 1/2/4/8 s plus jitter). */
     public static function retryDelayMs(int $attempt, string|null $retryAfter): int
     {
-        if (null !== $retryAfter && is_numeric($retryAfter) && (float) $retryAfter >= 0) {
-            return (int) min(30_000, (float) $retryAfter * 1000);
-        }
+        return Supertext::retryDelayMs($attempt, $retryAfter);
+    }
 
-        return (1000 << min($attempt, 3)) + random_int(0, 250);
+    /** Authorization header value; a pasted `Supertext-Auth-Key ` prefix is not doubled. */
+    public static function authHeader(#[\SensitiveParameter] string $apiKey): string
+    {
+        return Supertext::authHeader($apiKey);
     }
 
     /**
-     * Authorization header value. Accepts the key with or without the
-     * `Supertext-Auth-Key ` prefix (Supertext shows it with the prefix).
+     * @template T
+     *
+     * @param \Closure(): T $operation
+     *
+     * @return T
      */
-    public static function authHeader(string $apiKey): string
+    private function call(\Closure $operation): mixed
     {
-        return 'Supertext-Auth-Key '.preg_replace('/^Supertext-Auth-Key\s+/i', '', trim($apiKey));
+        try {
+            return $operation();
+        } catch (SdkException $e) {
+            $detail = (string) $e->detail;
+
+            if (null !== $e->apiErrorCode && '' !== $e->apiErrorCode) {
+                $detail = $e->apiErrorCode.('' !== $detail ? ': '.$detail : '');
+            }
+
+            throw new SupertextException($e->errorCode, $e->getMessage(), $e->status, $e, $detail);
+        }
     }
 }

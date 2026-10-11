@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Supertext\ContaoTranslation\Translation;
 
+use Supertext\Sdk\LanguageCodes;
+
 /**
  * Maps the `language` of a Contao website root to Supertext language codes:
  * regional targets (`de` => `de-DE`, `de-CH` kept, or the configured code) and
- * bare sources (`de-CH` => `de`). Rules in LanguageCodes.
+ * bare sources (`de-CH` => `de`). The rules are the Supertext SDK's LanguageCodes.
  */
 final class Languages
 {
@@ -27,7 +29,7 @@ final class Languages
      */
     public function target(string $language): string
     {
-        return LanguageCodes::target($language, $this->map[$language] ?? '');
+        return LanguageCodes::target($language, $this->map);
     }
 
     /**
@@ -36,7 +38,7 @@ final class Languages
      */
     public function source(string $language): string
     {
-        return LanguageCodes::source($language, $this->map[$language] ?? '');
+        return LanguageCodes::source($language, $this->map);
     }
 
     /** @return 'default'|'less'|'more' */

@@ -28,6 +28,7 @@ $GLOBALS['TL_LANG']['MSC']['supertext'] = [
     'error_too_many_requests' => 'Trop de requêtes vers Supertext. Veuillez réessayer dans un instant.',
     'error_service_unavailable' => 'Le service Supertext est indisponible.',
     'error_unexpected_status' => 'Supertext a renvoyé un code de statut inattendu (%s).',
+    'error_invalid_language_pair' => 'Supertext ne prend pas en charge cette combinaison de langues. Veuillez vérifier la langue des pages racines ou le paramètre language_map.',
     'error_transport_error' => 'Impossible de joindre Supertext.',
     'error_no_file_id' => 'Supertext n\'a pas renvoyé d\'identifiant de fichier.',
     'error_translation_error' => 'Supertext n\'a pas pu traduire le document.',

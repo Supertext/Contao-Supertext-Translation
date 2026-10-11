@@ -11,13 +11,13 @@ src/
   Translation/PageTranslator.php   copies a page (+ articles, content elements) into target roots and translates
   Translation/ContaoHooks.php      Contao-framework parts: text encoding per field, versions, aliases, cache tags
   Translation/FieldMap.php         translated fields per table (defaults + config overrides)
-  Translation/Languages.php        Contao language → Supertext target/source code, politeness
-  Translation/LanguageCodes.php    language code rules (bare source, regional target with defaults)
+  Translation/Languages.php        Contao language → Supertext target/source code (SDK LanguageCodes), politeness
   Translation/TranslationReport    result per target root
   Html/SegmentDocument.php         builds/parses the HTML document sent to Supertext
   Html/Protector.php               hides insert tags and basic entities from the translator
   Html/FieldCodec.php              field value ⇄ segments (text, html, inputUnit, list, table)
-  Supertext/SupertextClient.php    Supertext AI file API v1 (Symfony HttpClient)
+  Supertext/SupertextClient.php    Supertext AI file API v1 on the Supertext SDK (submit now, collect later; SDK errors → SupertextException)
+  Supertext/SymfonyHttpTransport   sends the SDK's requests through Symfony's HTTP client (proxy settings, MockHttpClient in tests)
 contao/dca/                        new columns, page operation, permission field
 contao/languages/{en,de,fr,it}/    back-end strings (screen, permission, messages)
 templates/translate.html.twig      back-end screen (@SupertextTranslation)
@@ -78,39 +78,23 @@ AI file translation API v1, same as the WordPress and Payload plugins. Base URLs
 | Delete | `DELETE translate/ai/file/{id}` | always attempted (expires after 24 h anyway) |
 | Key check | `GET features` | `SupertextClient::validateApiKey()` (not wired to the UI yet) |
 
-The key is sent as `Authorization: Supertext-Auth-Key <key>`; a pasted prefix is stripped (`SupertextClient::authHeader()`). HTTP 429 (`RATE_LIMIT_EXCEEDED`, a per-second limit per key) is retried up to 4 times: `Retry-After` if sent, else 1/2/4/8 s plus jitter (`retryDelayMs()`); uploads are sent as a string so they can be repeated.
+The protocol is implemented by the [Supertext SDK](https://github.com/Supertext/Supertext-API-SDK-and-Guide) (`supertext/supertext-sdk`, PHP 8.1+, no dependencies besides ext-curl/ext-json), which `SupertextClient` wraps:
 
-HTTP errors → `SupertextException::$errorCode`: 401/403 `authentication_failure`, 404 `not_found`, 413 `payload_too_large`, 429 `too_many_requests`, 500/502/503 `service_unavailable`, else `unexpected_status`; network failures `transport_error`.
+- the `Authorization: Supertext-Auth-Key <key>` header, a pasted prefix stripped;
+- the multipart upload with the file part's Content-Type exactly `text/html`;
+- HTTP 429 (`RATE_LIMIT_EXCEEDED`, a per-second limit per key) retried up to 4 times: `Retry-After` if sent, else 1/2/4/8 s plus jitter;
+- polling with a timeout, and deleting the file afterwards, also after errors;
+- language codes (see below) and error codes.
 
-## Local setup
+The bundle keeps its own steps: `PageTranslator` builds the document (`Html\SegmentDocument`, with insert-tag placeholders and its own parser that keeps the source text for segments missing from the answer), **submits** the document for every target language first and **collects** them afterwards, so Supertext works on all languages in parallel. `SymfonyHttpTransport` implements the SDK's `HttpTransport` with Symfony's HTTP client. The SDK's `SupertextException` becomes the bundle's `SupertextException` with the same `errorCode`; `detail` carries the API's error code and text (e.g. `INVALID_LANGUAGE_PAIR: …`).
 
-```bash
-git clone https://github.com/Supertext/Contao-Supertext-Translation.git
-cd Contao-Supertext-Translation
-composer install
-vendor/bin/phpunit --testsuite unit
-```
+Error codes (shown as `MSC.supertext.error_<code>` in four languages): `missing_api_key`, `authentication_failure` (401/403), `invalid_language_pair`, `not_found` (404), `payload_too_large` (413), `too_many_requests` (429 after the retries), `service_unavailable` (5xx), `unexpected_status`, `transport_error` (no answer), `no_file_id`, `translation_error`, `quota_exceeded`, `file_deleted`, `timeout`, `incomplete_response`.
 
-Integration tests need a Contao installation with this bundle installed and a migrated MySQL/MariaDB database:
-
-```bash
-composer create-project contao/managed-edition:5.7.* ../contao-dev
-cd ../contao-dev
-composer config repositories.supertext path ../Contao-Supertext-Translation
-composer require -W supertext/contao-supertext-translation:@dev terminal42/contao-changelanguage
-composer require --dev phpunit/phpunit:^12.4 symfony/dotenv
-echo 'DATABASE_URL=mysql://user:pass@127.0.0.1:3306/contao_test' > .env.local
-vendor/bin/contao-console contao:migrate --no-interaction
-
-CONTAO_PROJECT_DIR=$PWD CONTAO_TEST_DATABASE_URL='mysql://user:pass@127.0.0.1:3306/contao_test' \
-  vendor/bin/phpunit -c ../Contao-Supertext-Translation/phpunit.xml.dist
-```
-
-The integration tests **empty** `tl_page`, `tl_article`, `tl_content` and `tl_version` of that database. They boot the real Contao kernel (`tests/bootstrap.php` uses the installation's autoloader) and replace Supertext with `tests/FakeSupertext.php` (Symfony `MockHttpClient`; "translates" by prefixing `[<target_lang>] `).
+The SDK isn't on Packagist yet: `composer.json` requires `supertext/supertext-sdk: dev-main` from its GitHub repository (`no-api`, so plain git over HTTPS without a GitHub token). The demo (`demo/composer.json`) and CI do the same. Once it is released, require a version (`^0.1`) and drop the repository entries.
 
 ### Language codes
 
-Learned from the live API: the **source** is the bare language (`en`, `de`), the **target** a regional code (`de-DE`, `fr-CH`, `en-US`). Supertext rejects a bare target such as `de` with `INVALID_LANGUAGE_PAIR`, and a regional source too. `Translation\LanguageCodes` applies the rule; `Translation\Languages` feeds it the website root's *Language* and `language_map`:
+Learned from the live API: the **source** is the bare language (`en`, `de`), the **target** a regional code (`de-DE`, `fr-CH`, `en-US`). Supertext rejects a bare target such as `de` with `INVALID_LANGUAGE_PAIR`, and a regional source too. The rules are the SDK's `Supertext\Sdk\LanguageCodes` (the same in every Supertext SDK, tested against its shared vectors); `Translation\Languages` feeds them the website root's *Language* and `language_map`:
 
 - Source: the source root's language (or its `language_map` code) reduced to the language: `de-CH` → `de`.
 - Target: the `language_map` code if set, otherwise the root's language. A code with a region keeps it, normalized (`de_CH` / `de-ch` → `de-CH`; scripts and numeric regions stay: `zh-Hant`, `es-419`). A bare code gets a regional default: ar→ar-SA, bg→bg-BG, cs→cs-CZ, da→da-DK, de→de-DE, el→el-GR, en→en-US, es→es-ES, et→et-EE, fi→fi-FI, fr→fr-FR, hr→hr-HR, hu→hu-HU, it→it-IT, ja→ja-JP, ko→ko-KR, lt→lt-LT, lv→lv-LV, nb→nb-NO, nl→nl-NL, pl→pl-PL, pt→pt-PT, ro→ro-RO, ru→ru-RU, sk→sk-SK, sl→sl-SI, sr→sr-RS, sv→sv-SE, th→th-TH, tr→tr-TR, uk→uk-UA, vi→vi-VN, zh→zh-CN (same table as the other Supertext plugins). Unknown bare codes are sent unchanged, so Supertext's error names them.
