@@ -12,6 +12,7 @@ src/
   Translation/ContaoHooks.php      Contao-framework parts: text encoding per field, versions, aliases, cache tags
   Translation/FieldMap.php         translated fields per table (defaults + config overrides)
   Translation/Languages.php        Contao language → Supertext target/source code, politeness
+  Translation/LanguageCodes.php    language code rules (bare source, regional target with defaults)
   Translation/TranslationReport    result per target root
   Html/SegmentDocument.php         builds/parses the HTML document sent to Supertext
   Html/Protector.php               hides insert tags and basic entities from the translator
@@ -71,7 +72,7 @@ AI file translation API v1, same as the WordPress and Payload plugins. Base URLs
 
 | Step | Request | Notes |
 | --- | --- | --- |
-| Upload | `POST translate/ai/file` multipart: `file` (`content.html`, type exactly `text/html`), `target_lang`, optional `source_lang` (primary subtag), optional `politeness` (`more`/`less`) | → `{ file_id }` |
+| Upload | `POST translate/ai/file` multipart: `file` (`content.html`, type exactly `text/html`), `target_lang`, optional `source_lang` (bare language; see *Language codes*), optional `politeness` (`more`/`less`) | → `{ file_id }` |
 | Poll | `GET translate/ai/file/{id}/status` | `translating`, `done`, `error`, `limit_exceeded`, `deleted` |
 | Download | `GET translate/ai/file/{id}/translation` | translated HTML |
 | Delete | `DELETE translate/ai/file/{id}` | always attempted (expires after 24 h anyway) |
@@ -107,11 +108,22 @@ CONTAO_PROJECT_DIR=$PWD CONTAO_TEST_DATABASE_URL='mysql://user:pass@127.0.0.1:33
 
 The integration tests **empty** `tl_page`, `tl_article`, `tl_content` and `tl_version` of that database. They boot the real Contao kernel (`tests/bootstrap.php` uses the installation's autoloader) and replace Supertext with `tests/FakeSupertext.php` (Symfony `MockHttpClient`; "translates" by prefixing `[<target_lang>] `).
 
+### Language codes
+
+Learned from the live API: the **source** is the bare language (`en`, `de`), the **target** a regional code (`de-DE`, `fr-CH`, `en-US`). Supertext rejects a bare target such as `de` with `INVALID_LANGUAGE_PAIR`, and a regional source too. `Translation\LanguageCodes` applies the rule; `Translation\Languages` feeds it the website root's *Language* and `language_map`:
+
+- Source: the source root's language (or its `language_map` code) reduced to the language: `de-CH` → `de`.
+- Target: the `language_map` code if set, otherwise the root's language. A code with a region keeps it, normalized (`de_CH` / `de-ch` → `de-CH`; scripts and numeric regions stay: `zh-Hant`, `es-419`). A bare code gets a regional default: ar→ar-SA, bg→bg-BG, cs→cs-CZ, da→da-DK, de→de-DE, el→el-GR, en→en-US, es→es-ES, et→et-EE, fi→fi-FI, fr→fr-FR, hr→hr-HR, hu→hu-HU, it→it-IT, ja→ja-JP, ko→ko-KR, lt→lt-LT, lv→lv-LV, nb→nb-NO, nl→nl-NL, pl→pl-PL, pt→pt-PT, ro→ro-RO, ru→ru-RU, sk→sk-SK, sl→sl-SI, sr→sr-RS, sv→sv-SE, th→th-TH, tr→tr-TR, uk→uk-UA, vi→vi-VN, zh→zh-CN (same table as the other Supertext plugins). Unknown bare codes are sent unchanged, so Supertext's error names them.
+- Translating within one language (source `en`, target `en-GB`) is allowed.
+
+`tests/FakeSupertext.php` and the docs stand-in reject bare targets and regional sources like the real API.
+
 ## Tests
 
 - `tests/Unit/SupertextClientTest` — protocol, multipart fields, status/HTTP error mapping, timeout, runtime environment selection
 - `tests/Unit/SegmentDocumentTest` — HTML build/parse, umlauts, insert tags in text and attributes, lost placeholders, field codecs, text encodings of Contao 5 and 6, no object unserialization
 - `tests/Unit/LanguageFilesTest` — `contao/languages/{de,fr,it}` have the same keys, placeholders, HTML tags and URLs as `en`; every error code has an `MSC.supertext.error_<code>` message
+- `tests/Unit/LanguagesTest` — language code rules: bare source, regional source → bare, bare target → default region, regional target normalized, `language_map` wins, unknown codes unchanged
 - `tests/Unit/ConfigurationTest` — config keys like `de-CH` are kept (Symfony would turn dashes into underscores)
 - `tests/Integration/PageTranslatorTest` — real Contao + database: translating into several roots, nested elements, insert tags, re-translation updates in place and hides removed elements, missing parents and whole trees, only roots of the same site, Supertext errors per language, field overrides
 

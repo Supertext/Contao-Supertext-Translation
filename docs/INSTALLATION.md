@@ -70,14 +70,14 @@ The bundle's screens, the permission and its messages are available in English, 
 
 ![Settings of the German website root: Language de-CH, Language fallback off](images/07-language-root.png)
 
-Each website root's *Language* is sent to Supertext as the target language (`de-CH` stays `de-CH`); the source language is sent as its primary subtag (`de-CH` → `de`), because Supertext rejects regional source codes. Contao's own codes (`de`, `de-CH`, `fr`, `pt-BR`) need no setup.
+Each website root's *Language* is sent to Supertext as the target language (`de-CH` stays `de-CH`). Supertext needs a region for target languages, so a language without one gets a default: `de` → `de-DE`, `fr` → `fr-FR`, `it` → `it-IT`, `en` → `en-US` (full list in the [developer guide](DEVELOPER.md#language-codes)); set the root's language to e.g. `de-CH`, or use `language_map`, for another region. The source language is sent without region (`de-CH` → `de`), because Supertext rejects regional source codes. Contao's own codes (`de`, `de-CH`, `fr`, `pt-BR`) need no setup.
 
 If your roots use codes Supertext doesn't know, or you want formal/informal address, configure it in `config/config.yaml`:
 
 ```yaml
 supertext_translation:
     language_map:
-        de-CH: de-CH        # Contao language => Supertext code
+        de: de-CH           # Contao language => Supertext target code (include the region)
     politeness:
         de-CH: more         # formal ("Sie"); "less" = informal
 ```
@@ -93,7 +93,7 @@ Target languages are the other website roots **of the same domain** (same *Domai
 | `api_key` | `%env(SUPERTEXT_API_KEY)%` | Supertext API key. |
 | `environment` | `live` | `live`, `staging` or `testing` Supertext API. May be an env variable. |
 | `api_url` | `''` | Explicit API base URL (e.g. a proxy); overrides `environment`. |
-| `language_map` | `{}` | Contao language → Supertext language code. |
+| `language_map` | `{}` | Contao language → Supertext target code with region (e.g. `de: de-CH`); for the source only its language is used. |
 | `politeness` | `{}` | Contao language → `default`, `more` (formal) or `less` (informal). |
 | `poll_interval` | `2` | Seconds between status checks while Supertext translates. |
 | `timeout` | `180` | Maximum seconds to wait for one page and language. |

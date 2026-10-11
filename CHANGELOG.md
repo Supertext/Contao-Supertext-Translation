@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Fixed
+
+- Target languages without a region (e.g. a website root with language `de`) are now sent to Supertext as a regional code (`de-DE`, `fr-FR`, `en-US`, …), which Supertext requires; `language_map` codes are normalized (`de_ch` → `de-CH`).
+
 ### Added
 
 - French and Italian interface (and German where it was missing): the translate screen, the permission and all messages, including Supertext errors, follow the back-end user's language.

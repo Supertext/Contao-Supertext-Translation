@@ -40,7 +40,7 @@ final class SupertextClientTest extends TestCase
     public function testOmitsOptionalFields(): void
     {
         $fake = new FakeSupertext();
-        $this->client($fake)->translateHtml('<div data-st-id="a">x</div>', 'en');
+        $this->client($fake)->translateHtml('<div data-st-id="a">x</div>', 'en-US');
 
         $this->assertStringNotContainsString('source_lang', $fake->calls[0]['body']);
         $this->assertStringNotContainsString('politeness', $fake->calls[0]['body']);
@@ -70,7 +70,7 @@ final class SupertextClientTest extends TestCase
         $fake = new FakeSupertext([$status]);
 
         try {
-            $this->client($fake)->translateHtml('x', 'en');
+            $this->client($fake)->translateHtml('x', 'en-US');
             $this->fail('Expected an exception');
         } catch (SupertextException $e) {
             $this->assertSame($code, $e->errorCode);
@@ -83,7 +83,7 @@ final class SupertextClientTest extends TestCase
     {
         $fake = new FakeSupertext(['translating']);
         $this->expectExceptionObject(new SupertextException('timeout', 'Timed out waiting for the Supertext translation to finish.'));
-        $this->client($fake, timeoutMs: 5000)->translateHtml('x', 'en');
+        $this->client($fake, timeoutMs: 5000)->translateHtml('x', 'en-US');
     }
 
     public static function httpProvider(): iterable
@@ -99,7 +99,7 @@ final class SupertextClientTest extends TestCase
     public function testMapsHttpErrors(int $status, string $code): void
     {
         try {
-            $this->client(new FakeSupertext(failStatus: $status))->submit('x', 'en');
+            $this->client(new FakeSupertext(failStatus: $status))->submit('x', 'en-US');
             $this->fail('Expected an exception');
         } catch (SupertextException $e) {
             $this->assertSame($code, $e->errorCode);

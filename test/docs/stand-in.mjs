@@ -27,6 +27,10 @@ http
 			const chunks = [];
 			for await (const chunk of req) chunks.push(chunk);
 			const form = await new Request('http://x', { method: 'POST', headers: req.headers, body: Buffer.concat(chunks) }).formData();
+			// Like the real API: the target needs a region (de-DE), the source must be bare (en).
+			if (!/^[a-z]{2,3}-[A-Za-z0-9]{2,4}$/.test(form.get('target_lang') ?? '') || /[-_]/.test(form.get('source_lang') ?? '')) {
+				return send(400, { error: { code: 'INVALID_LANGUAGE_PAIR', message: `Invalid language pair ${form.get('source_lang')} -> ${form.get('target_lang')}` } });
+			}
 			const id = randomBytes(6).toString('hex');
 			files.set(id, { html: await form.get('file').text(), target: String(form.get('target_lang')) });
 			return send(200, { file_id: id });

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Supertext\ContaoTranslation\Translation;
 
 /**
- * Maps the `language` of a Contao website root to Supertext language codes.
+ * Maps the `language` of a Contao website root to Supertext language codes:
+ * regional targets (`de` => `de-DE`, `de-CH` kept, or the configured code) and
+ * bare sources (`de-CH` => `de`). Rules in LanguageCodes.
  */
 final class Languages
 {
@@ -19,19 +21,22 @@ final class Languages
     ) {
     }
 
-    /** Targets keep their region (`de-CH`). */
+    /**
+     * Targets need a region: kept and normalized (`de_ch` => `de-CH`), or a default
+     * for a bare language (`de` => `de-DE`). A configured code wins.
+     */
     public function target(string $language): string
     {
-        return $this->map[$language] ?? str_replace('_', '-', trim($language));
+        return LanguageCodes::target($language, $this->map[$language] ?? '');
     }
 
     /**
-     * Supertext expects the source as a primary subtag (`de`, not `de-CH`); a regional
+     * Supertext expects the source as a bare language (`de`, not `de-CH`); a regional
      * source is rejected with INVALID_LANGUAGE_PAIR.
      */
     public function source(string $language): string
     {
-        return strtolower((string) preg_split('/[-_]/', $this->target($language))[0]);
+        return LanguageCodes::source($language, $this->map[$language] ?? '');
     }
 
     /** @return 'default'|'less'|'more' */
