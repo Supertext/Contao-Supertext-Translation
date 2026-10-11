@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Supertext\ContaoTranslation\Supertext;
 
-use Supertext\Sdk\Client;
-use Supertext\Sdk\Supertext;
-use Supertext\Sdk\SupertextException as SdkException;
+use Supertext\ContaoTranslation\Sdk\Client;
+use Supertext\ContaoTranslation\Sdk\Supertext;
+use Supertext\ContaoTranslation\Sdk\SupertextException as SdkException;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**

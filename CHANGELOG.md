@@ -6,7 +6,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Changed
 
-- The Supertext API is now used through the [Supertext SDK](https://github.com/Supertext/Supertext-API-SDK-and-Guide) (`supertext/supertext-sdk`): auth header, upload, rate-limit retries, polling, cleanup, language codes and error codes come from it. Until the SDK is on Packagist, installing with Composer needs its GitHub repository (see the installation guide).
+- The Supertext API is now used through the [Supertext SDK](https://github.com/Supertext/Supertext-API-SDK-and-Guide) (`supertext/supertext-sdk`): auth header, upload, rate-limit retries, polling, cleanup, language codes and error codes come from it. The SDK is included in the bundle, so nothing extra has to be installed.
 - New message for a language pair Supertext doesn't support (`invalid_language_pair`), in English, German, French and Italian.
 - `symfony/mime` is no longer required.
 

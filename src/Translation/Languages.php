@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Supertext\ContaoTranslation\Translation;
 
-use Supertext\Sdk\LanguageCodes;
+use Supertext\ContaoTranslation\Sdk\LanguageCodes;
 
 /**
  * Maps the `language` of a Contao website root to Supertext language codes:

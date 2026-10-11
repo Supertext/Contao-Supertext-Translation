@@ -27,6 +27,7 @@ COPY demo/composer.json ./
 RUN printf 'APP_ENV=prod\n' > .env
 COPY composer.json README.md LICENSE plugin/
 COPY src plugin/src
+COPY lib plugin/lib
 COPY config plugin/config
 COPY contao plugin/contao
 COPY templates plugin/templates

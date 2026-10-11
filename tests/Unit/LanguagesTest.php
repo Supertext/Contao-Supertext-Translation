@@ -7,7 +7,7 @@ namespace Supertext\ContaoTranslation\Tests\Unit;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Supertext\ContaoTranslation\Translation\Languages;
-use Supertext\Sdk\LanguageCodes;
+use Supertext\ContaoTranslation\Sdk\LanguageCodes;
 
 final class LanguagesTest extends TestCase
 {

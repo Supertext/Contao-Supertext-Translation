@@ -23,7 +23,6 @@
         "ext-dom": "*",
         "contao/core-bundle": "^5.7 || ^6.0",
         "doctrine/dbal": "^3.7 || ^4.3",
-        "supertext/supertext-sdk": "dev-main",
         "symfony/config": "^7.4 || ^8.0",
         "symfony/dependency-injection": "^7.4 || ^8.0",
         "symfony/http-client": "^7.4 || ^8.0",
@@ -40,6 +39,7 @@
     },
     "autoload": {
         "psr-4": {
+            "Supertext\\ContaoTranslation\\Sdk\\": "lib/supertext-sdk/src/",
             "Supertext\\ContaoTranslation\\": "src/"
         }
     },
@@ -56,13 +56,6 @@
             "contao/manager-plugin": true,
             "contao-components/installer": true,
             "php-http/discovery": false
-        }
-    },
-    "repositories": {
-        "supertext-sdk": {
-            "type": "vcs",
-            "url": "https://github.com/Supertext/Supertext-API-SDK-and-Guide",
-            "no-api": true
         }
     }
 }
