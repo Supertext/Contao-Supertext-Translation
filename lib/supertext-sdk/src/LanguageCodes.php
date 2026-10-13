@@ -29,7 +29,11 @@ final class LanguageCodes
 
     private const VALID = '/^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$/';
 
-    /** "de_ch" → "de-CH", "zh-hant" → "zh-Hant", "es-419" stays. */
+    /**
+     * "de_ch" → "de-CH", "zh-hant" → "zh-Hant", "es-419" stays. Variants and extensions after a script or
+     * region are dropped ("de_DE_formal" → "de-DE", "en-US-x-twain" → "en-US"); a code whose second subtag
+     * is neither a script nor a region is kept ("de-CHE") and isn't valid.
+     */
     public static function normalize(string $code): string
     {
         $code = trim($code);
@@ -38,13 +42,26 @@ final class LanguageCodes
         }
 
         $parts = explode('-', str_replace('_', '-', $code));
-        $parts[0] = strtolower($parts[0]);
-        for ($i = 1, $n = \count($parts); $i < $n; $i++) {
+        $out = [strtolower($parts[0])];
+        $next = 1;
+        $count = \count($parts);
+        if ($next < $count && preg_match('/^[A-Za-z]{4}$/', $parts[$next]) === 1) {
+            $out[] = ucfirst(strtolower($parts[$next++])); // script
+        }
+        if ($next < $count && preg_match('/^(?:[A-Za-z]{2}|[0-9]{3})$/', $parts[$next]) === 1) {
+            $out[] = strtoupper($parts[$next++]); // region
+        }
+        if ($next > 1) {
+            return implode('-', $out); // variants and extensions dropped
+        }
+
+        $parts[0] = $out[0];
+        for ($i = 1; $i < $count; $i++) {
             $part = $parts[$i];
             if (preg_match('/^[A-Za-z]{2}$/', $part) === 1) {
-                $parts[$i] = strtoupper($part); // region
+                $parts[$i] = strtoupper($part);
             } elseif (preg_match('/^[A-Za-z]{4}$/', $part) === 1) {
-                $parts[$i] = ucfirst(strtolower($part)); // script
+                $parts[$i] = ucfirst(strtolower($part));
             }
         }
 

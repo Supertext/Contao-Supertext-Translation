@@ -10,6 +10,7 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ### Fixed
 
+- Language codes with a variant or extension, e.g. `de-DE-1996` or `en-US-x-twain` in `language_map`, are now sent to Supertext as `de-DE` / `en-US` (Supertext rejected them).
 - Target languages without a region (e.g. a website root with language `de`) are now sent to Supertext as a regional code (`de-DE`, `fr-FR`, `en-US`, …), which Supertext requires; `language_map` codes are normalized (`de_ch` → `de-CH`).
 
 ### Added
