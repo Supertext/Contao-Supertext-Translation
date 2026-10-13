@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
+### Changed
+
+- The connection to Supertext now uses the shared [Supertext SDK](https://github.com/Supertext/Supertext-API-SDK-and-Guide) (PHP SDK 0.1.0, shipped in `lib/supertext-sdk` until it is on Packagist), still through Contao's HTTP client. Translation works as before; an unsupported language pair now has its own message (*Supertext does not support this language pair*) in all four languages.
+
 ### Fixed
 
 - Target languages without a region (e.g. a website root with language `de`) are now sent to Supertext as a regional code (`de-DE`, `fr-FR`, `en-US`, …), which Supertext requires; `language_map` codes are normalized (`de_ch` → `de-CH`).

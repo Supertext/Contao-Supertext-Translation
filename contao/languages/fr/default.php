@@ -24,6 +24,7 @@ $GLOBALS['TL_LANG']['MSC']['supertext'] = [
     'error_authentication_failure' => 'Échec de l\'authentification. Veuillez vérifier votre clé API Supertext.',
     'error_missing_api_key' => 'Aucune clé API Supertext n\'est configurée.',
     'error_not_found' => 'La ressource Supertext demandée est introuvable.',
+    'error_invalid_language_pair' => 'Supertext ne prend pas en charge cette paire de langues. Vérifiez la langue des points de départ et les codes de langue Supertext.',
     'error_payload_too_large' => 'Le document est trop volumineux pour être traduit par Supertext.',
     'error_too_many_requests' => 'Trop de requêtes vers Supertext. Veuillez réessayer dans un instant.',
     'error_service_unavailable' => 'Le service Supertext est indisponible.',

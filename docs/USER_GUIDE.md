@@ -73,6 +73,7 @@ The translate screen and its messages appear in your back-end language (English,
 | *No Supertext API key is configured* | Ask your administrator; the message links to the Supertext account signup and API key pages for them. |
 | *There is no other language of this website you may edit* | Ask your administrator to create the language roots or give you access. |
 | *Authentication failure* / *limit is exceeded* | Supertext account problem; ask your administrator. |
+| *Supertext does not support this language pair* | The language of a website root isn't one Supertext translates into (or from). Ask your administrator to check the root's language or its Supertext language code. |
 | *Timed out waiting…* | Try again, or translate fewer pages at once. |
 | *The parent of page … has no translation* | Translate the parent page into that language first (or tick *Also translate all subpages* on the parent). |
 

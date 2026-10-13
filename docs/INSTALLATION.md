@@ -141,7 +141,7 @@ Remove the package (Contao Manager or `composer remove supertext/contao-supertex
 | "Authentication failure" | Wrong key, or a key for another environment (`live` vs `staging`). Generate a new key at <https://www.supertext.com/en/integrations/api> (Admin role required). |
 | "Too many requests to Supertext" | Supertext's per-second rate limit. Each request is retried up to 4 times automatically; if it still appears, translate fewer languages at once and try again. |
 | "Your Supertext translation limit is exceeded" | The Supertext subscription quota is used up. |
-| `INVALID_LANGUAGE_PAIR` in the error | A root's language isn't a code Supertext knows; add a `language_map` entry. |
+| "Supertext does not support this language pair" | A root's language isn't a code Supertext knows (or the pair isn't offered); add a `language_map` entry. The log has the codes that were sent. |
 | "Timed out waiting…" | Very long page or slow service: raise `timeout`, and the web server timeouts. |
 | "Insert tags were moved to the end…" | The translation lost the position of an insert tag; it was appended so nothing breaks. Check the text. |
 | Language switcher doesn't show a translation | The translated page is still unpublished, or changelanguage isn't installed. |

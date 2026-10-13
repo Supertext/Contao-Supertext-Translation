@@ -50,7 +50,11 @@ final class LanguageFilesTest extends TestCase
 
     public function testEveryErrorCodeHasAMessage(): void
     {
-        $codes = [];
+        // Supertext errors: every code the SDK can raise.
+        $codes = array_values(array_filter(
+            (new \ReflectionClass(\Supertext\Sdk\SupertextException::class))->getConstants(),
+            static fn (mixed $value): bool => \is_string($value) && 1 === preg_match('/^[a-z_]+$/', $value),
+        ));
 
         foreach (glob(__DIR__.'/../../src/{Supertext,Translation}/*.php', GLOB_BRACE) as $file) {
             $php = file_get_contents($file);

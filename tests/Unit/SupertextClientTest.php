@@ -82,7 +82,7 @@ final class SupertextClientTest extends TestCase
     public function testTimesOut(): void
     {
         $fake = new FakeSupertext(['translating']);
-        $this->expectExceptionObject(new SupertextException('timeout', 'Timed out waiting for the Supertext translation to finish.'));
+        $this->expectExceptionObject(new SupertextException('timeout', 'Timed out waiting for the Supertext translation.'));
         $this->client($fake, timeoutMs: 5000)->translateHtml('x', 'en-US');
     }
 
@@ -141,22 +141,13 @@ final class SupertextClientTest extends TestCase
         $this->assertCount(5, $fake->calls);
     }
 
-    public function testRetryDelayUsesRetryAfter(): void
-    {
-        $this->assertSame(3000, SupertextClient::retryDelayMs(0, '3'));
-        $this->assertSame(30_000, SupertextClient::retryDelayMs(0, '120'));
-        $delay = SupertextClient::retryDelayMs(1, null);
-        $this->assertTrue($delay >= 2000 && $delay <= 2250);
-    }
-
     public function testAcceptsKeyWithPrefix(): void
     {
         $fake = new FakeSupertext();
         $html = $this->client($fake, '  Supertext-Auth-Key test-key ')->translateHtml('<div data-st-id="a">Hallo</div>', 'fr-CH');
 
         $this->assertStringContainsString('[fr-CH] Hallo', $html);
-        $this->assertSame('Supertext-Auth-Key abc', SupertextClient::authHeader('abc'));
-        $this->assertSame('Supertext-Auth-Key abc', SupertextClient::authHeader('supertext-auth-key abc'));
+        // FakeSupertext rejects anything but exactly "Authorization: Supertext-Auth-Key test-key".
     }
 
     public function testRefusesWithoutKey(): void

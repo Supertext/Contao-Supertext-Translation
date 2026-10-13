@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Supertext\ContaoTranslation\Translation;
 
+use Supertext\Sdk\LanguageCodes as Sdk;
+
 /**
- * Turns CMS locales into the language codes Supertext accepts.
+ * Turns CMS locales into the language codes Supertext accepts, with the Supertext SDK's
+ * rules (Supertext\Sdk\LanguageCodes, the same in every Supertext plugin):
  *
  * - Source: the bare language ("en-US", "de_CH.UTF-8" => "en", "de").
  * - Target: a regional code. Supertext rejects bare targets such as "de" with
@@ -13,20 +16,13 @@ namespace Supertext\ContaoTranslation\Translation;
  *   "de-DE"); a locale with a region keeps it, normalized ("de_ch" => "de-CH").
  *   Unknown bare codes are sent unchanged.
  *
- * No Contao classes here: unit-tested (tests/Unit/LanguagesTest.php).
+ * Contao locales may carry an encoding or modifier ("de_CH.UTF-8@euro"); it is removed
+ * first. No Contao classes here: unit-tested (tests/Unit/LanguagesTest.php).
  */
 final class LanguageCodes
 {
     /** Regional default for bare target languages. */
-    public const DEFAULT_REGIONS = [
-        'ar' => 'ar-SA', 'bg' => 'bg-BG', 'cs' => 'cs-CZ', 'da' => 'da-DK', 'de' => 'de-DE',
-        'el' => 'el-GR', 'en' => 'en-US', 'es' => 'es-ES', 'et' => 'et-EE', 'fi' => 'fi-FI',
-        'fr' => 'fr-FR', 'hr' => 'hr-HR', 'hu' => 'hu-HU', 'it' => 'it-IT', 'ja' => 'ja-JP',
-        'ko' => 'ko-KR', 'lt' => 'lt-LT', 'lv' => 'lv-LV', 'nb' => 'nb-NO', 'nl' => 'nl-NL',
-        'pl' => 'pl-PL', 'pt' => 'pt-PT', 'ro' => 'ro-RO', 'ru' => 'ru-RU', 'sk' => 'sk-SK',
-        'sl' => 'sl-SI', 'sr' => 'sr-RS', 'sv' => 'sv-SE', 'th' => 'th-TH', 'tr' => 'tr-TR',
-        'uk' => 'uk-UA', 'vi' => 'vi-VN', 'zh' => 'zh-CN',
-    ];
+    public const DEFAULT_REGIONS = Sdk::DEFAULT_REGIONS;
 
     /**
      * Source code: the bare language ("de-CH" => "de"); empty stays empty.
@@ -34,7 +30,7 @@ final class LanguageCodes
      */
     public static function source(string $locale, string $override = ''): string
     {
-        return self::parts(trim($override) !== '' ? $override : $locale)[0] ?? '';
+        return Sdk::source(self::clean(trim($override) !== '' ? $override : $locale));
     }
 
     /**
@@ -44,33 +40,14 @@ final class LanguageCodes
      */
     public static function target(string $locale, string $override = ''): string
     {
-        $parts = self::parts(trim($override) !== '' ? $override : $locale);
-        if ($parts === []) {
-            return '';
-        }
-        if (count($parts) === 1) {
-            return self::DEFAULT_REGIONS[$parts[0]] ?? $parts[0];
-        }
-        foreach ($parts as $i => $part) {
-            if ($i === 0) {
-                continue;
-            }
-            $parts[$i] = match (true) {
-                strlen($part) === 4 && ctype_alpha($part) => ucfirst($part),
-                strlen($part) === 2 && ctype_alpha($part) => strtoupper($part),
-                default => $part,
-            };
-        }
-        return implode('-', $parts);
+        return Sdk::target(self::clean(trim($override) !== '' ? $override : $locale));
     }
 
-    /** @return list<string> lower-cased subtags without encoding or modifier ("de_CH.UTF-8@euro" => ["de", "ch"]) */
-    private static function parts(string $locale): array
+    /** "de_CH.UTF-8@euro" => "de_CH"; separators collapsed ("de--ch" => "de-ch"). */
+    private static function clean(string $locale): string
     {
-        $locale = strtolower(trim((string)preg_replace('/[.@].*$/', '', trim($locale))));
-        if ($locale === '') {
-            return [];
-        }
-        return array_values(array_filter(preg_split('/[-_]+/', $locale) ?: [], static fn(string $p): bool => $p !== ''));
+        $locale = trim((string) preg_replace('/[.@].*$/', '', trim($locale)));
+
+        return implode('-', array_values(array_filter(preg_split('/[-_]+/', $locale) ?: [], static fn (string $p): bool => '' !== $p)));
     }
 }
