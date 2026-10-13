@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Supertext\ContaoTranslation\Supertext;
 
-use Supertext\Sdk\Client;
-use Supertext\Sdk\SupertextException as SdkException;
+use Supertext\ContaoTranslation\Sdk\Client;
+use Supertext\ContaoTranslation\Sdk\SupertextException as SdkException;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * The bundle's access to the Supertext AI file translation API (v1), built on the shared
- * Supertext PHP SDK (lib/supertext-sdk, namespace Supertext\Sdk), which does the
+ * Supertext PHP SDK (lib/supertext-sdk, namespace Supertext\ContaoTranslation\Sdk), which does the
  * protocol: multipart upload, polling, download, cleanup, the auth header, HTTP 429
  * retries and language codes.
  *

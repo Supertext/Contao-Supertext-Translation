@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Supertext\Sdk;
+namespace Supertext\ContaoTranslation\Sdk;
 
 /**
  * Language codes for the Supertext AI file API.

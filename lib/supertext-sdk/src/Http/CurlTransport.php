@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Supertext\Sdk\Http;
+namespace Supertext\ContaoTranslation\Sdk\Http;
 
 /**
  * Default transport, using ext-curl. Honours the usual proxy environment variables (libcurl does).

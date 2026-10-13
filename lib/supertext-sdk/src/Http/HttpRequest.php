@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Supertext\Sdk\Http;
+namespace Supertext\ContaoTranslation\Sdk\Http;
 
 /**
  * One HTTP request, as handed to an HttpTransport.

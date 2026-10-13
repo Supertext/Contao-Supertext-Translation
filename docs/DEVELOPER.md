@@ -19,7 +19,7 @@ src/
   Html/FieldCodec.php              field value ⇄ segments (text, html, inputUnit, list, table)
   Supertext/SupertextClient.php    the bundle's Supertext client: wraps the SDK, maps its errors
   Supertext/SymfonyHttpTransport   sends the SDK's requests through Contao's Symfony HttpClient
-lib/supertext-sdk/                 Supertext PHP SDK (namespace Supertext\Sdk), copied by scripts/sync-sdk.sh
+lib/supertext-sdk/                 Supertext PHP SDK (namespace Supertext\ContaoTranslation\Sdk), copied by scripts/vendor-sdk.sh
 contao/dca/                        new columns, page operation, permission field
 contao/languages/{en,de,fr,it}/    back-end strings (screen, permission, messages)
 templates/translate.html.twig      back-end screen (@SupertextTranslation)
@@ -74,15 +74,15 @@ AI file translation API v1, same as the WordPress and Payload plugins. Base URLs
 
 ### Supertext SDK (`lib/supertext-sdk`)
 
-The protocol is done by the [Supertext PHP SDK](https://github.com/Supertext/Supertext-API-SDK-and-Guide) (`sdk/php`, Composer name `supertext/supertext-sdk`, namespace `Supertext\Sdk`), the shared client of all Supertext plugins. Until it is on Packagist, the bundle ships a copy in `lib/supertext-sdk/src`, autoloaded through this bundle's `composer.json` (`Supertext\Sdk\` → `lib/supertext-sdk/src/`); `lib/supertext-sdk/SOURCE` names the SDK version and commit. Never edit it: fix the SDK repository and copy it again:
+The protocol is done by the [Supertext PHP SDK](https://github.com/Supertext/Supertext-API-SDK-and-Guide) (`sdk/php`), the shared client of all Supertext plugins. The bundle ships its own copy in `lib/supertext-sdk/src` with the namespace changed from `Supertext\Sdk` to `Supertext\ContaoTranslation\Sdk`, autoloaded through this bundle's `composer.json`. Sites install only the bundle (also through the Contao Manager), and another extension that ships or requires the SDK can never clash with this copy. `lib/supertext-sdk/COMMIT` names the SDK commit. Never edit the copy: fix the SDK repository and copy it again:
 
 ```bash
-scripts/sync-sdk.sh                  # latest main of the SDK repository
-scripts/sync-sdk.sh v0.2.0           # a tag or commit
-SDK_DIR=../Supertext-API-SDK-and-Guide scripts/sync-sdk.sh   # a local checkout
+scripts/vendor-sdk.sh                  # latest main of the SDK repository
+scripts/vendor-sdk.sh <commit-or-tag>
+SDK_DIR=../Supertext-API-SDK-and-Guide scripts/vendor-sdk.sh   # a local clone as it is
 ```
 
-Then run the unit tests and PHPStan, and note the SDK version in `CHANGELOG.md`. Once the SDK is on Packagist, `supertext/supertext-sdk` becomes a normal requirement and `lib/` and the script go away. (Two plugins on one site that both ship a copy would share the `Supertext\Sdk` classes of whichever Composer loads first; the SDK keeps its public API compatible within a major version.)
+Then run the unit tests and PHPStan (which analyses `src/` only), and note the update in `CHANGELOG.md`. This stays so after the SDK is published.
 
 `Supertext\SupertextClient` wraps the SDK client: requests go through Contao's Symfony HttpClient (`SymfonyHttpTransport`, so proxy and TLS settings apply and ext-curl isn't needed), the User-Agent is `supertext-sdk-php Contao-Supertext-Translation`, and SDK errors are rethrown as the bundle's `SupertextException` with the same `errorCode`, the HTTP status and the API's detail. `PageTranslator` submits the documents for all target roots first and collects them afterwards, so Supertext works on all languages in parallel.
 
@@ -100,7 +100,7 @@ Error codes (`SupertextException::$errorCode`, the SDK's): `missing_api_key`, `a
 
 ### Language codes
 
-Learned from the live API: the **source** is the bare language (`en`, `de`), the **target** a regional code (`de-DE`, `fr-CH`, `en-US`). Supertext rejects a bare target such as `de` with `INVALID_LANGUAGE_PAIR`, and a regional source too. `Translation\LanguageCodes` applies the SDK's rule (`Supertext\Sdk\LanguageCodes`, after removing an encoding or modifier such as `.UTF-8@euro`); `Translation\Languages` feeds it the website root's *Language* and `language_map`:
+Learned from the live API: the **source** is the bare language (`en`, `de`), the **target** a regional code (`de-DE`, `fr-CH`, `en-US`). Supertext rejects a bare target such as `de` with `INVALID_LANGUAGE_PAIR`, and a regional source too. `Translation\LanguageCodes` applies the SDK's rule (the SDK's `LanguageCodes`, after removing an encoding or modifier such as `.UTF-8@euro`); `Translation\Languages` feeds it the website root's *Language* and `language_map`:
 
 - Source: the source root's language (or its `language_map` code) reduced to the language: `de-CH` → `de`.
 - Target: the `language_map` code if set, otherwise the root's language. A code with a region keeps it, normalized (`de_CH` / `de-ch` → `de-CH`; scripts and numeric regions stay: `zh-Hant`, `es-419`). A bare code gets a regional default from the SDK's `DEFAULT_REGIONS` (de→de-DE, en→en-US, fr→fr-FR, it→it-IT, pt→pt-PT, zh→zh-CN, …; the same table in every Supertext plugin). Unknown bare codes are sent unchanged, so Supertext's error names them.

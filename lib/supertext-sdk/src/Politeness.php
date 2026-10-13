@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Supertext\Sdk;
+namespace Supertext\ContaoTranslation\Sdk;
 
 /**
  * Form of address in the translation, for languages that have one.

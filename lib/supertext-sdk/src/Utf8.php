@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Supertext\Sdk;
+namespace Supertext\ContaoTranslation\Sdk;
 
 /**
  * Small UTF-8 helpers, so the SDK doesn't need ext-mbstring.

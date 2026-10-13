@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Supertext\Sdk\Http;
+namespace Supertext\ContaoTranslation\Sdk\Http;
 
 /**
  * Sends HTTP requests for the client. Implement it to use your framework's HTTP client

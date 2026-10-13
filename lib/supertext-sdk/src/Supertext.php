@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Supertext\Sdk;
+namespace Supertext\ContaoTranslation\Sdk;
 
 /**
  * Constants and small protocol helpers shared by the client and integrations.

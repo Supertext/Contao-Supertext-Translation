@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Supertext\ContaoTranslation\Translation;
 
-use Supertext\Sdk\LanguageCodes as Sdk;
+use Supertext\ContaoTranslation\Sdk\LanguageCodes as Sdk;
 
 /**
  * Turns CMS locales into the language codes Supertext accepts, with the Supertext SDK's
- * rules (Supertext\Sdk\LanguageCodes, the same in every Supertext plugin):
+ * rules (Supertext\ContaoTranslation\Sdk\LanguageCodes, the same in every Supertext plugin):
  *
  * - Source: the bare language ("en-US", "de_CH.UTF-8" => "en", "de").
  * - Target: a regional code. Supertext rejects bare targets such as "de" with

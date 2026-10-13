@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Supertext\ContaoTranslation\Supertext;
 
-use Supertext\Sdk\Http\HttpRequest;
-use Supertext\Sdk\Http\HttpResponse;
-use Supertext\Sdk\Http\HttpTransport;
-use Supertext\Sdk\Http\TransportException;
+use Supertext\ContaoTranslation\Sdk\Http\HttpRequest;
+use Supertext\ContaoTranslation\Sdk\Http\HttpResponse;
+use Supertext\ContaoTranslation\Sdk\Http\HttpTransport;
+use Supertext\ContaoTranslation\Sdk\Http\TransportException;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 

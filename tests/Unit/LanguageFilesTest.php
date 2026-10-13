@@ -52,7 +52,7 @@ final class LanguageFilesTest extends TestCase
     {
         // Supertext errors: every code the SDK can raise.
         $codes = array_values(array_filter(
-            (new \ReflectionClass(\Supertext\Sdk\SupertextException::class))->getConstants(),
+            (new \ReflectionClass(\Supertext\ContaoTranslation\Sdk\SupertextException::class))->getConstants(),
             static fn (mixed $value): bool => \is_string($value) && 1 === preg_match('/^[a-z_]+$/', $value),
         ));
 

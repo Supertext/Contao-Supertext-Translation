@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Supertext\Sdk\Http;
+namespace Supertext\ContaoTranslation\Sdk\Http;
 
 /**
  * No HTTP answer (thrown by CurlTransport; the client reports it as `transport_error`).
