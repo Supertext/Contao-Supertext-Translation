@@ -371,8 +371,9 @@ final class Client
         $detail = $detail === '' ? null : Utf8::truncate($detail, 200);
 
         $code = match (true) {
-            // Checked on the raw body: the API has answered with JSON and with plain text.
-            $status === 400 && str_contains($response->body, 'INVALID_LANGUAGE_PAIR') => SupertextException::INVALID_LANGUAGE_PAIR,
+            // Checked on the raw body: the API has answered with JSON and with plain text, with HTTP 400
+            // and (for a language it doesn't know at all, e.g. target "xx-YY") with HTTP 404.
+            ($status === 400 || $status === 404) && str_contains($response->body, 'INVALID_LANGUAGE_PAIR') => SupertextException::INVALID_LANGUAGE_PAIR,
             $status === 401, $status === 403 => SupertextException::AUTHENTICATION_FAILURE,
             $status === 404 => SupertextException::NOT_FOUND,
             $status === 413 => SupertextException::PAYLOAD_TOO_LARGE,
