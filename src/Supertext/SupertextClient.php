@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace Supertext\ContaoTranslation\Supertext;
 
-use Supertext\ContaoTranslation\Sdk\Client;
-use Supertext\ContaoTranslation\Sdk\SupertextException as SdkException;
+use Supertext\ContaoTranslation\Sdk\V1\Client;
+use Supertext\ContaoTranslation\Sdk\V1\SupertextException as SdkException;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * The bundle's access to the Supertext AI file translation API (v1), built on the shared
  * Supertext PHP SDK (lib/supertext-sdk, namespace Supertext\ContaoTranslation\Sdk), which does the
- * protocol: multipart upload, polling, download, cleanup, the auth header, HTTP 429
- * retries and language codes.
+ * protocol: multipart upload, polling, download, cleanup, the auth header and HTTP 429
+ * retries. Language codes are resolved before (Translation\Languages): the client sends
+ * them as given.
  *
  *   1. POST   translate/ai/file                   multipart HTML upload → { file_id }
  *   2. GET    translate/ai/file/{id}/status       poll until `done`
@@ -85,15 +86,23 @@ class SupertextClient
         int $pollIntervalMs = 2000,
         int $timeoutMs = 180_000,
     ): self {
+        return new self($httpClient, trim((string) $apiKey), self::baseUrl($apiUrl, $environment), $pollIntervalMs, $timeoutMs);
+    }
+
+    /**
+     * The API base URL: `$apiUrl` (explicit URL) wins over `$environment` (live, staging, testing).
+     *
+     * @throws \InvalidArgumentException for an unknown environment without an explicit URL
+     */
+    public static function baseUrl(string|null $apiUrl, string|null $environment): string
+    {
         $environment = strtolower(trim((string) $environment)) ?: 'live';
 
         if (!isset(self::ENVIRONMENTS[$environment]) && '' === trim((string) $apiUrl)) {
             throw new \InvalidArgumentException(\sprintf('Unknown Supertext environment "%s"; use one of: %s.', $environment, implode(', ', array_keys(self::ENVIRONMENTS))));
         }
 
-        $baseUrl = trim((string) $apiUrl) ?: self::ENVIRONMENTS[$environment];
-
-        return new self($httpClient, trim((string) $apiKey), $baseUrl, $pollIntervalMs, $timeoutMs);
+        return trim((string) $apiUrl) ?: self::ENVIRONMENTS[$environment];
     }
 
     public function hasApiKey(): bool
@@ -112,8 +121,8 @@ class SupertextClient
     }
 
     /**
-     * Uploads a document and returns the file id. Language codes are sent the way
-     * Supertext wants them (bare source, regional target).
+     * Uploads a document and returns the file id. Language codes are sent as given
+     * (resolve them with Translation\Languages first).
      *
      * @param 'default'|'less'|'more' $politeness
      */
@@ -156,7 +165,7 @@ class SupertextClient
         try {
             return $fn();
         } catch (SdkException $e) {
-            throw new SupertextException($e->errorCode, $e->getMessage(), $e->status, $e, (string) $e->detail);
+            throw SupertextException::fromSdk($e);
         }
     }
 }

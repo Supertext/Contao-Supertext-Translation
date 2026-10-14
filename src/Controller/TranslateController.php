@@ -11,7 +11,10 @@ use Contao\CoreBundle\Security\DataContainer\ReadAction;
 use Contao\CoreBundle\Security\DataContainer\UpdateAction;
 use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
+use Supertext\ContaoTranslation\Reporting\Reporting;
+use Supertext\ContaoTranslation\Sdk\V1\ApiKeyCheck;
 use Supertext\ContaoTranslation\Supertext\SupertextClient;
+use Supertext\ContaoTranslation\Translation\Languages;
 use Supertext\ContaoTranslation\Translation\PageTranslator;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -19,7 +22,8 @@ use Symfony\Component\Routing\Attribute\Route;
 
 /**
  * "Translate with Supertext" screen, opened from the page operation in the site
- * structure. GET shows the target languages, POST runs the translation.
+ * structure. GET shows the target languages, POST runs the translation. Both run the
+ * Commando Center's version report and key check after the response (Reporting).
  */
 #[Route(
     '%contao.backend.route_prefix%/supertext/translate/{id}',
@@ -34,6 +38,8 @@ final class TranslateController extends AbstractBackendController
         private readonly PageTranslator $translator,
         private readonly SupertextClient $client,
         private readonly Connection $connection,
+        private readonly Languages $languages,
+        private readonly Reporting $reporting,
         private readonly LoggerInterface|null $logger = null,
     ) {
     }
@@ -91,6 +97,11 @@ final class TranslateController extends AbstractBackendController
                 foreach ($report->targets as $target) {
                     if (!$target['ok']) {
                         $this->logger?->error(\sprintf('Supertext translation of page ID %d into %s failed: %s', $id, $target['root']['language'], $target['error']));
+
+                        // Supertext rejected the key: the key check becomes "invalid" (reported once).
+                        if ('authentication_failure' === $target['errorCode']) {
+                            $this->reporting->queue(Reporting::AUTHENTICATION_FAILED, $request, (int) ($target['errorParams'][0] ?? 401) ?: 401);
+                        }
                     }
                 }
                 // Refresh "already translated" markers.
@@ -100,6 +111,18 @@ final class TranslateController extends AbstractBackendController
                 ));
             }
         }
+
+        // Version report and key check, after the response (never slows down or breaks this screen).
+        $this->reporting->queue(Reporting::ON_REQUEST, $request);
+
+        // The Supertext code of each language; unmapped languages can't be translated.
+        foreach ($roots as &$root) {
+            $root['supertext'] = $this->languages->targetOrNull($root['language']);
+            $root['politeness_unsupported'] = $this->languages->politenessUnsupported($root['language']);
+        }
+        unset($root);
+
+        $sourceLanguage = (string) $this->translator->sourceLanguage($id);
 
         return $this->render('@SupertextTranslation/translate.html.twig', [
             'headline' => 'Supertext',
@@ -116,8 +139,39 @@ final class TranslateController extends AbstractBackendController
             'report' => $report,
             'error' => $error,
             'api_key_configured' => $this->client->hasApiKey(),
+            'source_language' => $sourceLanguage,
+            'source_unmapped' => '' !== $sourceLanguage && null === $this->languages->sourceOrNull($sourceLanguage),
+            'status' => $user->isAdmin ? $this->status() : null,
             'back_url' => $this->generateUrl('contao_backend', ['do' => 'page']),
         ]);
+    }
+
+    /**
+     * Administrators only: the latest API key check and whether version information is sent.
+     *
+     * @return array{check: array{status: string, time: string, http_status: string}|null, reports: bool, reports_env: bool}
+     */
+    private function status(): array
+    {
+        $check = $this->reporting->lastCheck();
+
+        return [
+            'check' => null === $check ? null : [
+                'status' => \in_array($check->status, [ApiKeyCheck::OK, ApiKeyCheck::INVALID, ApiKeyCheck::MISSING, ApiKeyCheck::UNREACHABLE], true) ? $check->status : ApiKeyCheck::ERROR,
+                'time' => self::formatTime($check->checkedAt),
+                'http_status' => null === $check->httpStatus ? '–' : (string) $check->httpStatus,
+            ],
+            'reports' => $this->reporting->enabled(),
+            'reports_env' => $this->reporting->decidedByEnvironment(),
+        ];
+    }
+
+    /** The check's UTC time in the server's time zone (Y-m-d H:i; ISO order reads the same in every language). */
+    private static function formatTime(string $iso): string
+    {
+        $time = strtotime($iso);
+
+        return false === $time ? $iso : date('Y-m-d H:i', $time);
     }
 
     public static function canUse(BackendUser $user): bool

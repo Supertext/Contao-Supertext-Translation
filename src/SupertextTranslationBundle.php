@@ -22,8 +22,9 @@ use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
  *         api_key: '%env(SUPERTEXT_API_KEY)%'   # default
  *         environment: live                     # live | staging | testing (env var OK)
  *         api_url: ''                           # overrides environment (env var OK)
- *         language_map: { de-CH: de-CH }
- *         politeness: { de-CH: more }
+ *         language_map: { de: de-CH }         # Contao language => Supertext code
+ *         politeness: { de: more }
+ *         version_reports: true                 # SUPERTEXT_VERSION_REPORTS=0 also turns it off
  *         poll_interval: 2                      # seconds
  *         timeout: 180                          # seconds per page
  *         fields:
@@ -48,6 +49,7 @@ final class SupertextTranslationBundle extends AbstractBundle
                 // normalizeKeys(false): keep "de-CH" (Symfony would turn dashes into underscores)
                 ->arrayNode('language_map')->normalizeKeys(false)->useAttributeAsKey('language')->scalarPrototype()->end()->end()
                 ->arrayNode('politeness')->normalizeKeys(false)->useAttributeAsKey('language')->enumPrototype()->values(['default', 'less', 'more'])->end()->end()
+                ->booleanNode('version_reports')->info('Send version information to Supertext (SUPERTEXT_VERSION_REPORTS wins)')->defaultTrue()->end()
                 ->integerNode('poll_interval')->min(1)->defaultValue(2)->end()
                 ->integerNode('timeout')->min(10)->defaultValue(180)->end()
                 ->arrayNode('fields')
@@ -82,6 +84,7 @@ final class SupertextTranslationBundle extends AbstractBundle
             ->set('supertext_translation.poll_interval_ms', $config['poll_interval'] * 1000)
             ->set('supertext_translation.timeout_ms', $config['timeout'] * 1000)
             ->set('supertext_translation.fields', $config['fields'])
+            ->set('supertext_translation.version_reports', $config['version_reports'])
         ;
     }
 }

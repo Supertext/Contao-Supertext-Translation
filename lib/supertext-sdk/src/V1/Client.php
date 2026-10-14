@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Supertext\ContaoTranslation\Sdk;
+namespace Supertext\ContaoTranslation\Sdk\V1;
 
 use Supertext\ContaoTranslation\Sdk\Http\CurlTransport;
 use Supertext\ContaoTranslation\Sdk\Http\HttpRequest;
@@ -15,9 +15,8 @@ use Supertext\ContaoTranslation\Sdk\Http\HttpTransport;
  * One translation is: upload an HTML document, poll its status, download the translation, delete the
  * file. translateTexts() packs keyed texts into such documents and reads them back.
  *
- * Language codes are fixed up here (target "de" → "de-DE", source "en-US" → "en"), so callers can pass
- * their CMS locales. Integrations with per-language overrides call LanguageCodes::target($code, $overrides)
- * first; that is idempotent.
+ * Language codes are sent as given (trimmed): resolve CMS languages with Languages::target() and
+ * Languages::source() first, e.g. Languages::target($cmsLocale, ['de' => 'de-CH']).
  */
 final class Client
 {
@@ -33,6 +32,9 @@ final class Client
     /** @var callable(): float */
     private $clock;
 
+    /** @var callable(): float */
+    private $now;
+
     /**
      * A blank key doesn't fail here: the first request throws `missing_api_key` without sending anything,
      * so a client can be created before the integration is configured.
@@ -47,21 +49,23 @@ final class Client
      * @param HttpTransport|null           $transport      defaults to CurlTransport (needs ext-curl; pass your own transport to do without)
      * @param (callable(float): void)|null $sleep          sleeps the given seconds (for tests)
      * @param (callable(): float)|null     $clock          monotonic time in seconds (for tests)
+     * @param (callable(): float)|null     $now            wall-clock Unix time in seconds, for checkApiKey()'s checkedAt (for tests)
      */
     public function __construct(
         #[\SensitiveParameter] private readonly string $apiKey,
-        string $baseUrl = Supertext::LIVE_BASE_URL,
+        string $baseUrl = Protocol::LIVE_BASE_URL,
         private readonly float $pollInterval = 2.0,
         private readonly float $timeout = 180.0,
         private readonly float $requestTimeout = 30.0,
-        private readonly int $maxRetries = Supertext::DEFAULT_MAX_RETRIES,
+        private readonly int $maxRetries = Protocol::DEFAULT_MAX_RETRIES,
         ?string $userAgent = null,
         ?HttpTransport $transport = null,
         ?callable $sleep = null,
         ?callable $clock = null,
+        ?callable $now = null,
     ) {
         $baseUrl = trim($baseUrl);
-        $this->baseUrl = rtrim($baseUrl !== '' ? $baseUrl : Supertext::LIVE_BASE_URL, '/') . '/';
+        $this->baseUrl = rtrim($baseUrl !== '' ? $baseUrl : Protocol::LIVE_BASE_URL, '/') . '/';
         $userAgent = $userAgent === null ? '' : trim($userAgent);
         $this->userAgent = $userAgent === '' ? self::USER_AGENT : self::USER_AGENT . ' ' . $userAgent;
         $this->transport = $transport ?? new CurlTransport();
@@ -71,12 +75,46 @@ final class Client
             }
         };
         $this->clock = $clock ?? static fn (): float => hrtime(true) / 1e9;
+        $this->now = $now ?? static fn (): float => microtime(true);
     }
 
     /** Keeps the key out of var_dump() and print_r(). */
     public function __debugInfo(): array
     {
         return ['baseUrl' => $this->baseUrl, 'userAgent' => $this->userAgent];
+    }
+
+    /**
+     * The language pairs the API offers right now, with their features ("supports_politeness", …): the live
+     * version of Languages::SOURCES and TARGETS, e.g. for a settings page. Cost-free. Malformed entries are skipped.
+     *
+     * @return list<FeatureSupport>
+     *
+     * @throws SupertextException e.g. authentication_failure
+     */
+    public function getFeatures(): array
+    {
+        $list = self::json($this->request('GET', 'features'))['supported_features'] ?? null;
+        if (!\is_array($list) || !array_is_list($list)) {
+            return [];
+        }
+        $out = [];
+        foreach ($list as $item) {
+            if (!$item instanceof \stdClass) {
+                continue;
+            }
+            $source = $item->source_lang ?? null;
+            $target = $item->target_lang ?? null;
+            if (!\is_string($source) || !\is_string($target)) {
+                continue;
+            }
+            $features = isset($item->features) && \is_array($item->features)
+                ? array_values(array_filter($item->features, '\is_string'))
+                : [];
+            $out[] = new FeatureSupport($source, $target, $features);
+        }
+
+        return $out;
     }
 
     /**
@@ -90,17 +128,47 @@ final class Client
     }
 
     /**
+     * The automatic API key check: `GET features` with a 10 s timeout (or the request timeout, if
+     * shorter) and the usual 429 retries, mapped to ApiKeyCheck::OK, INVALID, MISSING, UNREACHABLE or
+     * ERROR. Never throws. A blank key gives MISSING without a request.
+     */
+    public function checkApiKey(): ApiKeyCheck
+    {
+        $checkedAt = ApiKeyCheck::timestamp(($this->now)());
+        $fingerprint = Protocol::apiKeyFingerprint($this->apiKey);
+        if ($fingerprint === '') {
+            return new ApiKeyCheck(ApiKeyCheck::MISSING, $checkedAt, null, null, '');
+        }
+        try {
+            $response = $this->request('GET', 'features', timeout: min((float) ApiKeyCheck::TIMEOUT, $this->requestTimeout));
+
+            return new ApiKeyCheck(ApiKeyCheck::OK, $checkedAt, $response->status, null, $fingerprint);
+        } catch (\Throwable $e) {
+            return ApiKeyCheck::fromError($e, $checkedAt, $fingerprint);
+        }
+    }
+
+    /**
      * Uploads an HTML document for translation and returns its file id.
      *
-     * @param string      $targetLang any form ("de", "de_ch"); sent as a regional code
-     * @param string|null $sourceLang any form ("en-GB"); sent as a bare language. Null or "": auto-detect.
+     * The language codes are sent as given (trimmed): resolve CMS languages with Languages::target() and
+     * Languages::source() first.
+     *
+     * @param string      $targetLang a Supertext target code, e.g. "de-CH" (Languages::target())
+     * @param string|null $sourceLang a Supertext source code, e.g. "en" (Languages::source()). Null or "": auto-detect.
      * @param string      $politeness Politeness::DEFAULT, MORE (formal) or LESS (informal)
+     *
+     * @throws SupertextException unsupported_language for an empty target (nothing is sent)
      */
     public function submit(string $html, string $targetLang, ?string $sourceLang = null, string $politeness = Politeness::DEFAULT): string
     {
+        $target = trim($targetLang);
+        if ($target === '') {
+            throw new SupertextException(SupertextException::UNSUPPORTED_LANGUAGE);
+        }
         // Fields in the order the API documents; the file comes last.
-        $fields = ['target_lang' => LanguageCodes::target($targetLang)];
-        $source = LanguageCodes::source($sourceLang ?? '');
+        $fields = ['target_lang' => $target];
+        $source = trim($sourceLang ?? ''); // omitted: auto-detect
         if ($source !== '') {
             $fields['source_lang'] = $source;
         }
@@ -233,7 +301,7 @@ final class Client
         string $targetLang,
         ?string $sourceLang = null,
         string $politeness = Politeness::DEFAULT,
-        int $maxCharacters = Supertext::DEFAULT_MAX_CHARACTERS,
+        int $maxCharacters = Protocol::DEFAULT_MAX_CHARACTERS,
     ): array {
         $result = [];
         $toSend = [];
@@ -276,7 +344,7 @@ final class Client
      *
      * @return list<array<K, Segment>>
      */
-    public static function batches(array $segments, int $maxCharacters = Supertext::DEFAULT_MAX_CHARACTERS): array
+    public static function batches(array $segments, int $maxCharacters = Protocol::DEFAULT_MAX_CHARACTERS): array
     {
         $batches = [];
         $current = [];
@@ -308,10 +376,10 @@ final class Client
      *
      * @throws SupertextException
      */
-    private function request(string $method, string $path, ?string $body = null, ?string $contentType = null): HttpResponse
+    private function request(string $method, string $path, ?string $body = null, ?string $contentType = null, ?float $timeout = null): HttpResponse
     {
         // Throws missing_api_key before anything is sent.
-        $authorization = Supertext::authHeader($this->apiKey);
+        $authorization = Protocol::authHeader($this->apiKey);
         $headers = [
             'Authorization' => $authorization,
             'Accept' => 'application/json',
@@ -320,7 +388,7 @@ final class Client
         if ($contentType !== null) {
             $headers['Content-Type'] = $contentType;
         }
-        $request = new HttpRequest($method, $this->baseUrl . $path, $headers, $body, $this->requestTimeout);
+        $request = new HttpRequest($method, $this->baseUrl . $path, $headers, $body, $timeout ?? $this->requestTimeout);
 
         for ($attempt = 0; ; $attempt++) {
             try {
@@ -335,7 +403,7 @@ final class Client
             if ($response->status !== 429 || $attempt >= $this->maxRetries) {
                 break;
             }
-            ($this->sleep)(Supertext::retryDelayMs($attempt, $response->header('Retry-After')) / 1000);
+            ($this->sleep)(Protocol::retryDelayMs($attempt, $response->header('Retry-After')) / 1000);
         }
 
         if ($response->status >= 200 && $response->status < 300) {
@@ -346,7 +414,7 @@ final class Client
         $detail = $error->detail === null ? null : self::redact($error->detail, $authorization);
         if ($detail !== $error->detail) {
             // Never pass the key on, not even if a proxy or server echoes it back.
-            $error = new SupertextException($error->errorCode, $error->status, $detail, $error->apiErrorCode, $error->sourceLang, $error->targetLang);
+            $error = new SupertextException($error->errorCode, $error->status, $detail, $error->apiErrorCode, $error->sourceLang, $error->targetLang, feature: $error->feature);
         }
 
         throw $error;
@@ -365,7 +433,7 @@ final class Client
     {
         $status = $response->status;
         $data = self::json($response);
-        $apiErrorCode = isset($data['error_code']) && \is_string($data['error_code']) ? $data['error_code'] : null;
+        $apiErrorCode = self::string($data, 'error_code');
 
         $detail = trim((string) preg_replace('/<[^>]*>/', '', $response->body), " \t\n\r\f");
         $detail = $detail === '' ? null : Utf8::truncate($detail, 200);
@@ -374,6 +442,8 @@ final class Client
             // Checked on the raw body: the API has answered with JSON and with plain text, with HTTP 400
             // and (for a language it doesn't know at all, e.g. target "xx-YY") with HTTP 404.
             ($status === 400 || $status === 404) && str_contains($response->body, 'INVALID_LANGUAGE_PAIR') => SupertextException::INVALID_LANGUAGE_PAIR,
+            // The pair exists, but not with this option (e.g. politeness for en-US).
+            $status === 400 && $apiErrorCode === 'FEATURE_ERROR' => SupertextException::UNSUPPORTED_FEATURE,
             $status === 401, $status === 403 => SupertextException::AUTHENTICATION_FAILURE,
             $status === 404 => SupertextException::NOT_FOUND,
             $status === 413 => SupertextException::PAYLOAD_TOO_LARGE,
@@ -382,13 +452,26 @@ final class Client
             default => SupertextException::UNEXPECTED_STATUS,
         };
 
-        $sourceLang = $targetLang = null;
-        if ($code === SupertextException::INVALID_LANGUAGE_PAIR) {
-            $sourceLang = isset($data['source_lang']) && \is_string($data['source_lang']) ? $data['source_lang'] : null;
-            $targetLang = isset($data['target_lang']) && \is_string($data['target_lang']) ? $data['target_lang'] : null;
+        $sourceLang = $targetLang = $feature = null;
+        if ($code === SupertextException::INVALID_LANGUAGE_PAIR || $code === SupertextException::UNSUPPORTED_FEATURE) {
+            $sourceLang = self::string($data, 'source_lang');
+            $targetLang = self::string($data, 'target_lang');
+        }
+        if ($code === SupertextException::UNSUPPORTED_FEATURE) {
+            $feature = self::string($data, 'feature');
         }
 
-        return new SupertextException($code, $status, $detail, $apiErrorCode, $sourceLang, $targetLang);
+        return new SupertextException($code, $status, $detail, $apiErrorCode, $sourceLang, $targetLang, feature: $feature);
+    }
+
+    /**
+     * A non-empty string field of a decoded JSON object, else null (the API's JSON isn't trusted to have the documented types).
+     *
+     * @param array<mixed> $data
+     */
+    private static function string(array $data, string $name): ?string
+    {
+        return isset($data[$name]) && \is_string($data[$name]) && $data[$name] !== '' ? $data[$name] : null;
     }
 
     /** @return array<mixed> the JSON object in the body, or [] (also for JSON arrays and scalars) */

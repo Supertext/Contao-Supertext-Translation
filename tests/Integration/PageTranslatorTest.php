@@ -7,6 +7,8 @@ namespace Supertext\ContaoTranslation\Tests\Integration;
 use Contao\ManagerBundle\HttpKernel\ContaoKernel;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
+use Supertext\ContaoTranslation\Reporting\DatabaseStateStore;
+use Supertext\ContaoTranslation\Reporting\Reporting;
 use Supertext\ContaoTranslation\Supertext\SupertextClient;
 use Supertext\ContaoTranslation\Tests\FakeSupertext;
 use Supertext\ContaoTranslation\Translation\ContaoHooks;
@@ -14,6 +16,9 @@ use Supertext\ContaoTranslation\Translation\FieldMap;
 use Supertext\ContaoTranslation\Translation\Languages;
 use Supertext\ContaoTranslation\Translation\PageTranslator;
 use Symfony\Component\Dotenv\Dotenv;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Runs against a real Contao installation with this bundle installed and a migrated
@@ -59,13 +64,13 @@ final class PageTranslatorTest extends TestCase
         $this->fake = new FakeSupertext();
     }
 
-    private function translator(FakeSupertext|null $fake = null, array $fieldOverrides = []): PageTranslator
+    private function translator(FakeSupertext|null $fake = null, array $fieldOverrides = [], Languages|null $languages = null): PageTranslator
     {
         $container = self::$kernel->getContainer();
         $client = new SupertextClient(($fake ?? $this->fake)->client(), 'test-key', 'https://api.test/v1', 1000, 10_000, static function (): void {});
         $hooks = new ContaoHooks($container->get('contao.framework'), $this->db, $container->get('contao.slug'));
 
-        return new PageTranslator($this->db, $client, new FieldMap($fieldOverrides), new Languages([], ['de-CH' => 'more']), $hooks);
+        return new PageTranslator($this->db, $client, new FieldMap($fieldOverrides), $languages ?? new Languages([], ['de-CH' => 'more']), $hooks);
     }
 
     private function insert(string $table, array $row): int
@@ -249,5 +254,73 @@ final class PageTranslatorTest extends TestCase
 
         $this->assertStringNotContainsString('[de-CH]', $de['description']);
         $this->assertSame('<p>Short teaser</p>', $this->db->fetchOne('SELECT teaser FROM tl_article WHERE pid = ?', [$de['id']]));
+    }
+
+    public function testLanguageWithoutSupertextCodeFailsAndSendsNothing(): void
+    {
+        $s = $this->site();
+        // Bare "de" is no Supertext target (de-DE, de-CH or de-AT?): no guessing.
+        $this->db->update('tl_page', ['language' => 'de'], ['id' => $s['de']]);
+        $report = $this->translator()->translatePage($s['about'], [$s['de'], $s['fr']]);
+
+        $this->assertSame('unsupported_language', $report->targets[$s['de']]['errorCode']);
+        $this->assertSame(['de'], $report->targets[$s['de']]['errorParams']);
+        $this->assertTrue($report->targets[$s['fr']]['ok'], 'the other languages are translated');
+        $this->assertSame(['fr-CH'], array_column($this->fake->submitted, 'target'));
+        $this->assertSame(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM tl_page WHERE pid = ?', [$s['de']]));
+    }
+
+    public function testLanguageMapChoosesTheSupertextCode(): void
+    {
+        $s = $this->site();
+        $this->db->update('tl_page', ['language' => 'de'], ['id' => $s['de']]);
+        $report = $this->translator(languages: new Languages(['de' => 'de-AT', 'en' => 'en-GB']))->translatePage($s['about'], [$s['de']]);
+
+        $this->assertTrue($report->targets[$s['de']]['ok']);
+        $this->assertSame('de-AT', $this->fake->submitted[0]['target']);
+        $this->assertSame('en', $this->fake->submitted[0]['source'], 'the source in its source form');
+    }
+
+    public function testReporterStateIsKeptInTheDatabase(): void
+    {
+        $this->db->executeStatement('DELETE FROM '.DatabaseStateStore::TABLE);
+        $store = new DatabaseStateStore($this->db);
+        $this->assertNull($store->load()->keyCheck);
+
+        $reports = [];
+        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$reports): MockResponse {
+            if (str_ends_with($url, '/features')) {
+                return new MockResponse('{"supported_features":[]}');
+            }
+
+            $reports[] = json_decode((string) $options['body'], true);
+
+            return new MockResponse('{"ok":true}', ['http_code' => 202]);
+        });
+        $reporting = new Reporting($store, $http, 'test-key', 'https://api.test/v1/', 'live', null, null, 'https://center.test/api/v1/report');
+
+        $first = $reporting->run(Reporting::ON_REQUEST, Request::create('https://www.example.ch/contao'));
+        $this->assertSame('installed', $first?->event);
+        $this->assertTrue($first?->sent);
+        $this->assertSame('Contao', $reports[0]['system']['name']);
+        $this->assertMatchesRegularExpression('/^(5\.7|6\.0)\./', $reports[0]['system']['version'], 'the installed Contao version');
+        $this->assertNotSame('0.0.0', $reports[0]['plugin']['version'], 'the version Composer installed');
+        $this->assertSame('ok', $store->load()->keyCheck?->status);
+
+        $reporting->run(Reporting::AUTHENTICATION_FAILED, Request::create('https://www.example.ch/contao'), 401);
+        $this->assertSame('invalid', $store->load()->keyCheck?->status);
+        $this->assertSame(1, (int) $this->db->fetchOne('SELECT COUNT(*) FROM '.DatabaseStateStore::TABLE), 'one row, updated');
+        $this->assertStringNotContainsString('test-key', (string) $this->db->fetchOne('SELECT data FROM '.DatabaseStateStore::TABLE));
+    }
+
+    public function testPublicPingRoute(): void
+    {
+        $response = self::$kernel->handle(Request::create('/_supertext/ping?challenge=abcdefghijklmnop1234'));
+
+        $this->assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+        $this->assertSame('{"ok":true,"plugin":"Contao-Supertext-Translation","challenge":"abcdefghijklmnop1234"}', $response->getContent());
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        $this->assertSame([], $response->headers->getCookies(), 'no session');
+        $this->assertSame(400, self::$kernel->handle(Request::create('/_supertext/ping?challenge=x'))->getStatusCode());
     }
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Supertext\ContaoTranslation\Supertext;
 
+use Supertext\ContaoTranslation\Sdk\V1\SupertextException as SdkException;
+
 /**
  * An error from the Supertext API or while talking to it. `$errorCode` is a stable
  * machine-readable code, the Supertext SDK's (same set in every Supertext plugin); the
@@ -20,5 +22,27 @@ final class SupertextException extends \RuntimeException
         public readonly string $detail = '',
     ) {
         parent::__construct($message, 0, $previous);
+    }
+
+    public static function fromSdk(SdkException $e): self
+    {
+        return new self($e->errorCode, $e->getMessage(), $e->status, $e, (string) $e->detail);
+    }
+
+    /**
+     * Placeholders of the back end's `MSC.supertext.error_<code>` message: the language for
+     * `unsupported_language` (the code that has no Supertext language), else the HTTP status.
+     *
+     * @return list<string>
+     */
+    public function messageParams(): array
+    {
+        if ('unsupported_language' === $this->errorCode) {
+            $sdk = $this->getPrevious();
+
+            return [$sdk instanceof SdkException ? (string) ($sdk->targetLang ?? $sdk->sourceLang) : ''];
+        }
+
+        return [(string) $this->httpStatus];
     }
 }

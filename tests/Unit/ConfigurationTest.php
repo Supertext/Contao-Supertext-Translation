@@ -29,5 +29,19 @@ final class ConfigurationTest extends TestCase
         $this->assertSame(['de-CH' => 'more'], $container->getParameter('supertext_translation.politeness'));
         $this->assertSame(['tl_content' => ['myCustomField' => 'html', 'caption' => false]], $container->getParameter('supertext_translation.fields'));
         $this->assertSame('live', $container->getParameter('supertext_translation.environment'));
+        $this->assertTrue($container->getParameter('supertext_translation.version_reports'), 'version reports are on by default');
+    }
+
+    public function testVersionReportsCanBeSwitchedOff(): void
+    {
+        $container = new ContainerBuilder();
+        $container->setParameter('kernel.environment', 'test');
+        $container->setParameter('kernel.build_dir', sys_get_temp_dir());
+        $extension = (new SupertextTranslationBundle())->getContainerExtension();
+        $container->registerExtension($extension);
+
+        $extension->load([['version_reports' => false]], $container);
+
+        $this->assertFalse($container->getParameter('supertext_translation.version_reports'));
     }
 }

@@ -2,8 +2,12 @@
 
 declare(strict_types=1);
 
+use Supertext\ContaoTranslation\Controller\PingController;
 use Supertext\ContaoTranslation\Controller\TranslateController;
 use Supertext\ContaoTranslation\EventListener\SupertextOperationListener;
+use Supertext\ContaoTranslation\Reporting\DatabaseStateStore;
+use Supertext\ContaoTranslation\Reporting\Reporting;
+use Supertext\ContaoTranslation\Reporting\StateStore;
 use Supertext\ContaoTranslation\Supertext\SupertextClient;
 use Supertext\ContaoTranslation\Translation\ContaoHooks;
 use Supertext\ContaoTranslation\Translation\FieldMap;
@@ -53,4 +57,27 @@ return static function (ContainerConfigurator $container): void {
     ;
 
     $services->set(SupertextOperationListener::class);
+
+    // Commando Center: version reports, API key check, ping (see src/Reporting/Reporting.php).
+    $services->set(DatabaseStateStore::class)->args([service('database_connection')]);
+    $services->alias(StateStore::class, DatabaseStateStore::class);
+
+    $services->set(Reporting::class)
+        ->args([
+            '$store' => service(StateStore::class),
+            '$httpClient' => service('http_client'),
+            '$apiKey' => param('supertext_translation.api_key'),
+            '$apiUrl' => param('supertext_translation.api_url'),
+            '$environment' => param('supertext_translation.environment'),
+            '$setting' => param('supertext_translation.version_reports'),
+            '$envReports' => '%env(default::SUPERTEXT_VERSION_REPORTS)%',
+            '$reportUrl' => '%env(default::SUPERTEXT_REPORT_URL)%',
+            '$router' => service('router'),
+            '$logger' => service('logger')->nullOnInvalid(),
+            '$now' => null,
+        ])
+        ->tag('kernel.event_listener', ['event' => 'kernel.terminate', 'method' => 'onKernelTerminate'])
+    ;
+
+    $services->set(PingController::class)->public();
 };

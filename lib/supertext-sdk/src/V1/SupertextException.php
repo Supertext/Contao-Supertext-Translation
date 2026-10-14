@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Supertext\ContaoTranslation\Sdk;
+namespace Supertext\ContaoTranslation\Sdk\V1;
 
 /**
  * Any failure talking to Supertext.
@@ -16,6 +16,8 @@ final class SupertextException extends \RuntimeException
     public const MISSING_API_KEY = 'missing_api_key';
     public const AUTHENTICATION_FAILURE = 'authentication_failure';
     public const INVALID_LANGUAGE_PAIR = 'invalid_language_pair';
+    public const UNSUPPORTED_LANGUAGE = 'unsupported_language';
+    public const UNSUPPORTED_FEATURE = 'unsupported_feature';
     public const NOT_FOUND = 'not_found';
     public const PAYLOAD_TOO_LARGE = 'payload_too_large';
     public const TOO_MANY_REQUESTS = 'too_many_requests';
@@ -36,6 +38,8 @@ final class SupertextException extends \RuntimeException
         self::MISSING_API_KEY => 'No Supertext API key is configured.' . self::KEY_LINKS,
         self::AUTHENTICATION_FAILURE => 'Supertext rejected the API key. Please check it.' . self::KEY_LINKS,
         self::INVALID_LANGUAGE_PAIR => 'Supertext does not support this language pair.',
+        self::UNSUPPORTED_LANGUAGE => 'This language has no Supertext language code. Map it to a Supertext language.',
+        self::UNSUPPORTED_FEATURE => 'Supertext does not support this option for the language pair.',
         self::NOT_FOUND => 'The file was not found at Supertext (it may have expired or been deleted).',
         self::PAYLOAD_TOO_LARGE => 'The document is too large for Supertext.',
         self::TOO_MANY_REQUESTS => 'Too many requests to Supertext. Please try again shortly.',
@@ -55,6 +59,11 @@ final class SupertextException extends \RuntimeException
      * @param int|null    $status       HTTP status, if the error came from an HTTP answer
      * @param string|null $detail       short text from the API's answer (tags removed, max 200 characters)
      * @param string|null $apiErrorCode the answer's JSON `error_code`, e.g. "INVALID_LANGUAGE_PAIR"
+     * @param string|null $sourceLang   invalid_language_pair, unsupported_feature: the API's source_lang;
+     *                                  unsupported_language: the source code that has no Supertext code
+     * @param string|null $targetLang   invalid_language_pair, unsupported_feature: the API's target_lang;
+     *                                  unsupported_language: the target code that has no Supertext code
+     * @param string|null $feature      unsupported_feature: the option the API names, e.g. "politeness"
      */
     public function __construct(
         public readonly string $errorCode,
@@ -64,6 +73,7 @@ final class SupertextException extends \RuntimeException
         public readonly ?string $sourceLang = null,
         public readonly ?string $targetLang = null,
         ?\Throwable $previous = null,
+        public readonly ?string $feature = null,
     ) {
         $message = self::MESSAGES[$errorCode] ?? 'Supertext request failed.';
         if ($status !== null) {

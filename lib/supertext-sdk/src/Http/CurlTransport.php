@@ -16,7 +16,7 @@ final class CurlTransport implements HttpTransport
     {
         if (!self::isAvailable()) {
             throw new \LogicException(
-                'The PHP curl extension is not loaded. Install it, or pass your own Supertext\\Sdk\\Http\\HttpTransport '
+                'The PHP curl extension is not loaded. Install it, or pass your own Supertext\\ContaoTranslation\\Sdk\\Http\\HttpTransport '
                 . '(e.g. wrapping your framework\'s HTTP client) as the Client\'s transport.'
             );
         }

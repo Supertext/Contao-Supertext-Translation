@@ -170,14 +170,17 @@ class PageTranslator
             }
 
             try {
+                // A language without a Supertext code fails here (unsupported_language); nothing is sent.
+                $target = $this->languages->target((string) $root['language']);
+                $sourceLang = $this->languages->source((string) $sourceRoot['language']);
                 $jobs[$rootId] = $this->client->submit(
                     $doc->toHtml(),
-                    $this->languages->target((string) $root['language']),
-                    $this->languages->source((string) $sourceRoot['language']),
+                    $target,
+                    $sourceLang,
                     $this->languages->politeness((string) $root['language']),
                 );
             } catch (SupertextException $e) {
-                $report->fail($rootId, $e->getMessage(), $e->errorCode, [(string) $e->httpStatus], $e->detail);
+                $report->fail($rootId, $e->getMessage(), $e->errorCode, $e->messageParams(), $e->detail);
             }
         }
 
@@ -199,7 +202,7 @@ class PageTranslator
                     fn () => $this->write($page, $articles, $elements, $sourceRoot, $rootId, $translations, $report),
                 );
             } catch (SupertextException $e) {
-                $report->fail($rootId, $e->getMessage(), $e->errorCode, [(string) $e->httpStatus], $e->detail);
+                $report->fail($rootId, $e->getMessage(), $e->errorCode, $e->messageParams(), $e->detail);
             } catch (TranslationException $e) {
                 $report->fail($rootId, $e->getMessage(), $e->errorCode, $e->params);
             } catch (\Throwable $e) {
@@ -352,6 +355,14 @@ class PageTranslator
         }
 
         return null;
+    }
+
+    /** Language of the website root a page belongs to, or null. */
+    public function sourceLanguage(int $pageId): string|null
+    {
+        $root = $this->rootOf($pageId);
+
+        return null === $root ? null : (string) $root['language'];
     }
 
     /** @return array<string, mixed>|null */

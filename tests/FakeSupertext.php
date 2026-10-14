@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Supertext\ContaoTranslation\Tests;
 
+use Supertext\ContaoTranslation\Sdk\V1\Languages;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
@@ -118,9 +119,15 @@ final class FakeSupertext
 
         if ('POST' === $method && str_ends_with($url, 'translate/ai/file')) {
             $parts = self::parseMultipart($body);
-            // Like the real API: the target needs a region (`de-DE`), the source must be bare (`en`).
-            if (!preg_match('/^[a-z]{2,3}-[A-Za-z0-9]{2,4}$/', $parts['target_lang']['body'] ?? '') || preg_match('/[-_]/', $parts['source_lang']['body'] ?? '')) {
-                return new MockResponse('{"error_code":"INVALID_LANGUAGE_PAIR"}', ['http_code' => 400]);
+            $target = $parts['target_lang']['body'] ?? '';
+            $source = $parts['source_lang']['body'] ?? '';
+            // Like the real API: only the exact codes of GET features (bare `de` or `es-ES` are 404).
+            if (!\in_array($target, array_column(Languages::TARGETS, 'code'), true) || ('' !== $source && !\in_array($source, array_column(Languages::SOURCES, 'code'), true))) {
+                return new MockResponse('{"error_code":"INVALID_LANGUAGE_PAIR"}', ['http_code' => 404]);
+            }
+            // Formal/informal only where offered (not en-US, rm, …).
+            if (\in_array($parts['politeness']['body'] ?? '', ['more', 'less'], true) && false === Languages::supportsPoliteness($target)) {
+                return new MockResponse('{"error_code":"FEATURE_ERROR","feature":"politeness"}', ['http_code' => 400]);
             }
             $id = 'f'.(++$this->counter);
             $this->files[$id] = [

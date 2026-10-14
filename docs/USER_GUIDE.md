@@ -11,7 +11,7 @@ In Contao, each language of a website has its own page tree: one website root pe
 
    ![Site structure: the English pages and empty German, French and Italian website roots, each row with the green translate icon](images/01-site-structure.png)
 
-3. Choose the languages to translate **into**. "Not translated yet" means a new page will be created.
+3. Choose the languages to translate **into**. "Not translated yet" means a new page will be created. A language marked *no Supertext language yet* can't be selected until your administrator maps it.
 4. If the page has subpages, tick **Also translate all subpages** to translate the whole branch.
 5. Click **Translate** and wait. One page takes a few seconds; keep the window open.
 
@@ -73,7 +73,9 @@ The translate screen and its messages appear in your back-end language (English,
 | *No Supertext API key is configured* | Ask your administrator; the message links to the Supertext account signup and API key pages for them. |
 | *There is no other language of this website you may edit* | Ask your administrator to create the language roots or give you access. |
 | *Authentication failure* / *limit is exceeded* | Supertext account problem; ask your administrator. |
-| *Supertext does not support this language pair* | The language of a website root isn't one Supertext translates into (or from). Ask your administrator to check the root's language or its Supertext language code. |
+| *no Supertext language yet* (next to a language) / *The language … has no Supertext language yet* | Your administrator hasn't told the bundle which Supertext language to use for it. Ask them to map it; the other languages are translated. |
+| *Supertext does not support this language pair* | The language of a website root isn't one Supertext translates into (or from). Ask your administrator to check the language mapping. |
+| *Supertext offers no formal or informal tone for this language* | The tone setting for that language isn't available; ask your administrator to set it to the default. |
 | *Timed out waiting…* | Try again, or translate fewer pages at once. |
 | *The parent of page … has no translation* | Translate the parent page into that language first (or tick *Also translate all subpages* on the parent). |
 

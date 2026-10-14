@@ -34,7 +34,7 @@ composer config repositories.supertext vcs https://github.com/Supertext/Contao-S
 composer require supertext/contao-supertext-translation:dev-main
 ```
 
-The database update adds a few columns (`supertext_source` on pages, articles and content elements, and the `supertext` permission on users and user groups). No existing data is changed.
+The database update adds a few columns (`supertext_source` on pages, articles and content elements, and the `supertext` permission on users and user groups) and a small table `tl_supertext_state` (see [Version information and the API key check](#version-information-and-the-api-key-check)). No existing data is changed.
 
 ## API key
 
@@ -49,7 +49,7 @@ SUPERTEXT_API_KEY=your-key-here
 
 The key works with or without the `Supertext-Auth-Key ` prefix that Supertext shows.
 
-Without a key, the translate screen shows "No Supertext API key is configured" with the two links above, and the *Translate* button is disabled.
+Without a key, the translate screen shows "No Supertext API key is configured" with the two links above, and the *Translate* button is disabled. The bundle also checks the key automatically; administrators see the result at the bottom of the translate screen (see [below](#version-information-and-the-api-key-check)).
 
 ## Permissions
 
@@ -70,17 +70,32 @@ The bundle's screens, the permission and its messages are available in English, 
 
 ![Settings of the German website root: Language de-CH, Language fallback off](images/07-language-root.png)
 
-Each website root's *Language* is sent to Supertext as the target language (`de-CH` stays `de-CH`). Supertext needs a region for target languages, so a language without one gets a default: `de` → `de-DE`, `fr` → `fr-FR`, `it` → `it-IT`, `en` → `en-US` (full list in the [developer guide](DEVELOPER.md#language-codes)); set the root's language to e.g. `de-CH`, or use `language_map`, for another region. The source language is sent without region (`de-CH` → `de`), because Supertext rejects regional source codes. Contao's own codes (`de`, `de-CH`, `fr`, `pt-BR`) need no setup.
+Each website root's *Language* needs a Supertext language. Supertext accepts exactly these target codes (from its `features` list, October 2026):
 
-If your roots use codes Supertext doesn't know, or you want formal/informal address, configure it in `config/config.yaml`:
+| Language | Supertext codes |
+| --- | --- |
+| German, English, French, Italian, Portuguese | `de-DE`, `de-CH`, `de-AT`, `en-US`, `en-GB`, `fr-FR`, `fr-CH`, `it-IT`, `it-CH`, `pt-PT`, `pt-BR` |
+| Chinese, Serbian | `zh-Hans`, `zh-Hant`, `sr-Latn`, `sr-Cyrl` |
+| Swiss German | `gsw-u-sd-chzh` (Zurich), `gsw-u-sd-chbe` (Bern) |
+| All others, without region | `bg`, `cs`, `da`, `el`, `es`, `fi`, `hr`, `hu`, `ja`, `ko`, `nb`, `nl`, `pl`, `rm`, `ru`, `sk`, `sl`, `sq`, `sv`, `tr` |
+
+- A root whose language **is** one of these codes (apart from upper/lower case and `_`/`-`) needs no setup: `de-CH`, `fr-CH`, `it-CH`, `es`, `nl`. The source language is sent without region (`de-CH` → `de`, `en` stays `en`).
+- **Every other language needs an entry in `language_map`**, for example a root with the language `de` (Germany, Switzerland or Austria?), `en` as a target (`en-US` or `en-GB`?), `pt`, `zh-CN` or `no`. The bundle never guesses a region: an unmapped language shows *no Supertext language yet* on the translate screen (it can't be selected), and a translation into it stops with *The language … has no Supertext language yet*; nothing is sent for it.
+- Formal/informal address (`politeness`) isn't offered for English, Swiss German, Romansh, Albanian and Serbian. The translate screen warns when it is set for such a language; leave those on `default`, or Supertext rejects the translation.
+
+Configure both in `config/config.yaml` and clear the cache:
 
 ```yaml
 supertext_translation:
     language_map:
-        de: de-CH           # Contao language => Supertext target code (include the region)
+        de: de-CH           # Contao language => Supertext code (one of the codes above)
+        en: en-GB           # used for both directions: as the source, en-GB is sent as en
+        zh-CN: zh-Hans
     politeness:
         de-CH: more         # formal ("Sie"); "less" = informal
 ```
+
+The translate screen shows, next to each language, the Supertext code it is sent as when it differs from the root's language.
 
 Target languages are the other website roots **of the same domain** (same *Domain name* setting) with a different language.
 
@@ -93,8 +108,9 @@ Target languages are the other website roots **of the same domain** (same *Domai
 | `api_key` | `%env(SUPERTEXT_API_KEY)%` | Supertext API key. |
 | `environment` | `live` | `live`, `staging` or `testing` Supertext API. May be an env variable. |
 | `api_url` | `''` | Explicit API base URL (e.g. a proxy); overrides `environment`. |
-| `language_map` | `{}` | Contao language → Supertext target code with region (e.g. `de: de-CH`); for the source only its language is used. |
+| `language_map` | `{}` | Contao language → Supertext code (e.g. `de: de-CH`, `zh-CN: zh-Hans`). Needed for every root language that isn't itself a Supertext code (see [Language setup](#language-setup)); there are no default regions. For the source, the mapped code's language is sent (`de-CH` → `de`). |
 | `politeness` | `{}` | Contao language → `default`, `more` (formal) or `less` (informal). |
+| `version_reports` | `true` | *Send version information to Supertext* (see [below](#version-information-and-the-api-key-check)). The environment variable `SUPERTEXT_VERSION_REPORTS` (`0`, `false`, `off`, `no` or `1`, `true`, `on`, `yes`) wins over this setting. |
 | `poll_interval` | `2` | Seconds between status checks while Supertext translates. |
 | `timeout` | `180` | Maximum seconds to wait for one page and language. |
 | `fields` | see below | Which fields are translated, per table. |
@@ -119,6 +135,18 @@ supertext_translation:
 
 Not translated: page aliases (a new alias is generated from the translated title), URLs, images and other files, code and HTML elements, form fields, news, events and FAQ (see the roadmap in the [Developer guide](DEVELOPER.md)).
 
+## Version information and the API key check
+
+**Send version information to Supertext** (`version_reports`, on by default) sends the site URL and the versions of this extension, Contao and the runtime to Supertext after an update and when the API key changes, so Supertext support can see which version you run. A report contains exactly: the site URL (the address the back end is used on), the extension's name and version, the Contao and PHP versions, the Supertext SDK version, whether a key is set, the result of the API key check below (status, time, HTTP status, Supertext's error code) and the address of the ping endpoint. **No content, no API key and no personal data are sent.** Reports go from the Contao server after the back-end page has been sent, never from the browser; a report that fails is not retried for an hour and never slows down or breaks a translation.
+
+To turn it off, set `version_reports: false` in `config/config.yaml` (then clear the cache), or the environment variable `SUPERTEXT_VERSION_REPORTS=0`. Nothing is sent at all then, and the ping endpoint answers 404.
+
+**The API key check** runs whether or not version information is sent: when the translate screen is opened with a key that hasn't been checked yet (the key is compared by a SHA-256 fingerprint kept in the database, never the key itself), and when Supertext rejects the key during a translation. It's Supertext's cost-free `features` call; nothing is translated or billed. The check runs after the page has been sent, so the result appears the next time the screen is opened. Administrators see the latest result with its time at the bottom of the translate screen: *the connection to Supertext works*, *Supertext rejected the API key* (with the links to create an account and generate a key), *no API key is set*, *Supertext can't be reached* or *Supertext answered with an error*. The same box shows whether version information is sent.
+
+**The ping endpoint** `GET <site>/_supertext/ping?challenge=…` is public (no login, no session, not cached) and answers only `{"ok":true,"plugin":"Contao-Supertext-Translation","challenge":"…"}`, so Supertext can see that the site is reachable from the internet. It returns nothing else: no versions, no settings, no data. If a firewall or a front-end proxy blocks `/_supertext/`, translations still work; only this check fails.
+
+The bundle keeps this state (what was reported last, the latest key check) as one row in the table `tl_supertext_state`, created by the database update.
+
 ## Hosting notes
 
 A translation runs while the editor waits (a few seconds per page; a whole site can take minutes). PHP's `max_execution_time` is lifted for the request; make sure your web server and proxies allow long requests (e.g. Apache `Timeout`, nginx `proxy_read_timeout` / `fastcgi_read_timeout` ≥ 300 s) when translating whole sites.
@@ -129,7 +157,7 @@ Contao Manager: update the package, then run the database update. Composer: `com
 
 ## Uninstall
 
-Remove the package (Contao Manager or `composer remove supertext/contao-supertext-translation`) and run the database update; it offers to drop the added columns. Translated pages stay as they are.
+Remove the package (Contao Manager or `composer remove supertext/contao-supertext-translation`) and run the database update; it offers to drop the added columns and the table `tl_supertext_state`. Translated pages stay as they are.
 
 ## Troubleshooting
 
@@ -141,7 +169,12 @@ Remove the package (Contao Manager or `composer remove supertext/contao-supertex
 | "Authentication failure" | Wrong key, or a key for another environment (`live` vs `staging`). Generate a new key at <https://www.supertext.com/en/integrations/api> (Admin role required). |
 | "Too many requests to Supertext" | Supertext's per-second rate limit. Each request is retried up to 4 times automatically; if it still appears, translate fewer languages at once and try again. |
 | "Your Supertext translation limit is exceeded" | The Supertext subscription quota is used up. |
-| "Supertext does not support this language pair" | A root's language isn't a code Supertext knows (or the pair isn't offered); add a `language_map` entry. The log has the codes that were sent. |
+| *no Supertext language yet* next to a language / "The language … has no Supertext language yet" | The root's language isn't a Supertext code: add it to `language_map` (see [Language setup](#language-setup)) and clear the cache. |
+| "Supertext does not support this language pair" | A mapped code Supertext doesn't offer (e.g. `es-ES` instead of `es`, `zh-CN` instead of `zh-Hans`, or the same language as the source); fix the `language_map` entry. The log has the codes that were sent. |
+| "Supertext offers no formal or informal tone for this language" | `politeness` sets `more`/`less` for a language without it (English, Swiss German, Romansh, Albanian, Serbian); remove that entry. |
+| "Supertext rejected the API key" in the API key check | The key is wrong or revoked. Check that the whole key was copied into `SUPERTEXT_API_KEY`, or generate a new one at <https://www.supertext.com/en/integrations/api> (Admin role required). No Supertext account yet? Create one at <https://www.supertext.com/person/en/account/signin>. Clear the cache and open the translate screen again. |
+| "The API key couldn't be checked because Supertext can't be reached" | The Contao server can't reach `api.supertext.com` (firewall, proxy, DNS). Translations need the same connection. |
+| "Not checked yet" in the API key check | The check runs after the page was sent; reload the screen. If it stays, run the database update (the table `tl_supertext_state` is missing). |
 | "Timed out waiting…" | Very long page or slow service: raise `timeout`, and the web server timeouts. |
 | "Insert tags were moved to the end…" | The translation lost the position of an insert tag; it was appended so nothing breaks. Check the text. |
 | Language switcher doesn't show a translation | The translated page is still unpublished, or changelanguage isn't installed. |

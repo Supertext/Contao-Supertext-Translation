@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Supertext\ContaoTranslation\Sdk;
+namespace Supertext\ContaoTranslation\Sdk\V1;
 
 /**
  * Packs segments into the HTML document sent to Supertext and reads them back from the translation.

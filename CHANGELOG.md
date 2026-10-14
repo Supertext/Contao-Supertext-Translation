@@ -4,18 +4,18 @@ All notable changes to this project are documented here. Format: [Keep a Changel
 
 ## [Unreleased]
 
-### Changed
-
-- The connection to Supertext now uses the shared [Supertext SDK](https://github.com/Supertext/Supertext-API-SDK-and-Guide) (PHP SDK 0.1.0, shipped with the bundle in `lib/supertext-sdk` under the bundle's own namespace, so nothing else needs installing), still through Contao's HTTP client. Translation works as before; an unsupported language pair now has its own message (*Supertext does not support this language pair*) in all four languages. An unknown language (e.g. `xx-YY`) is now reported as an unsupported language pair too, not as "resource not found" (Supertext answers it with HTTP 404).
-
-### Fixed
-
-- Language codes with a variant or extension, e.g. `de-DE-1996` or `en-US-x-twain` in `language_map`, are now sent to Supertext as `de-DE` / `en-US` (Supertext rejected them).
-- Target languages without a region (e.g. a website root with language `de`) are now sent to Supertext as a regional code (`de-DE`, `fr-FR`, `en-US`, …), which Supertext requires; `language_map` codes are normalized (`de_ch` → `de-CH`).
-
 ### Added
 
+- Automatic API key check: when the translate screen is opened with a key that hasn't been checked yet, and when Supertext rejects the key during a translation. Administrators see the latest result with its time at the bottom of the translate screen (*the connection works*, *rejected*, *no key*, *Supertext can't be reached*, *error*; with the links to create an account and generate a key) in English, German, French and Italian.
+- *Send version information to Supertext* (`version_reports`, on by default; `version_reports: false` or `SUPERTEXT_VERSION_REPORTS=0` turns it off): after an update and when the key check result changes, the bundle sends the site URL, the bundle, Contao, PHP and SDK versions, whether a key is set, the key check result and the ping address to Supertext, after the page has been sent. No content, no API key and no personal data. Shown on the translate screen for administrators.
+- Public ping endpoint `/_supertext/ping` that only echoes Supertext's challenge, so Supertext can check the site is reachable (404 with version reports off).
+- The database update adds the table `tl_supertext_state` for this state.
 - French and Italian interface (and German where it was missing): the translate screen, the permission and all messages, including Supertext errors, follow the back-end user's language.
+
+### Changed
+
+- **Languages are no longer guessed.** A website root language that is a Supertext code (`de-CH`, `fr-CH`, `it-CH`, `es`, `zh-Hans`, apart from case and `_`/`-`) is used as it is; every other language needs an entry in `language_map` (e.g. `de: de-CH`). The default regions are gone: they were wrong for most languages (Supertext wants `es`, `sl`, `nl` without region and `zh-Hans` instead of `zh-CN`), and a root with the language `de` is now *Germany, Switzerland or Austria?* for the administrator to decide. An unmapped language is marked *no Supertext language yet* on the translate screen and can't be selected; a translation into it stops with *The language … has no Supertext language yet* and nothing is sent. The screen shows the Supertext code a language is sent as and warns when formal/informal is set for a language Supertext offers no tone for. New messages for both cases in all four languages.
+- The connection to Supertext now uses the shared [Supertext SDK](https://github.com/Supertext/Supertext-API-SDK-and-Guide) (PHP SDK 0.2.1, commit `eeba8fa`, shipped with the bundle in `lib/supertext-sdk` under the bundle's own namespace, so nothing else needs installing), still through Contao's HTTP client. It brings the key check, the version reports and Supertext's language list. An unsupported language pair has its own message (*Supertext does not support this language pair*) in all four languages; an unknown language (e.g. `xx-YY`) is reported as an unsupported language pair too, not as "resource not found".
 
 ## [0.1.0] - 2026-10-07
 

@@ -52,7 +52,7 @@ final class LanguageFilesTest extends TestCase
     {
         // Supertext errors: every code the SDK can raise.
         $codes = array_values(array_filter(
-            (new \ReflectionClass(\Supertext\ContaoTranslation\Sdk\SupertextException::class))->getConstants(),
+            (new \ReflectionClass(\Supertext\ContaoTranslation\Sdk\V1\SupertextException::class))->getConstants(),
             static fn (mixed $value): bool => \is_string($value) && 1 === preg_match('/^[a-z_]+$/', $value),
         ));
 
@@ -68,6 +68,25 @@ final class LanguageFilesTest extends TestCase
 
         foreach ($codes as $code) {
             $this->assertArrayHasKey('error_'.$code, $messages, "No MSC.supertext.error_$code for error code $code");
+        }
+    }
+
+    public function testEveryKeyCheckResultHasAMessage(): void
+    {
+        $messages = self::load('en', 'default.php')['MSC']['supertext'];
+        $statuses = array_filter(
+            (new \ReflectionClass(\Supertext\ContaoTranslation\Sdk\V1\ApiKeyCheck::class))->getConstants(),
+            static fn (mixed $value): bool => \is_string($value),
+        );
+
+        foreach ($statuses as $status) {
+            $this->assertArrayHasKey('keycheck_'.$status, $messages);
+        }
+
+        // invalid and missing carry both Supertext links, opening in a new tab.
+        foreach (['keycheck_invalid', 'keycheck_missing'] as $key) {
+            $this->assertStringContainsString('href="https://www.supertext.com/person/en/account/signin" target="_blank" rel="noopener"', $messages[$key]);
+            $this->assertStringContainsString('href="https://www.supertext.com/en/integrations/api" target="_blank" rel="noopener"', $messages[$key]);
         }
     }
 

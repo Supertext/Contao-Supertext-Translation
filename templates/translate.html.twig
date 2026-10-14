@@ -18,6 +18,10 @@
                     <p class="tl_help tl_tip">{{ 'MSC.supertext.noApiKeyHelp'|trans|raw }}</p>
                 {% endif %}
 
+                {% if source_unmapped %}
+                    <p class="tl_error">{{ 'MSC.supertext.error_unsupported_language'|trans([source_language]) }}</p>
+                {% endif %}
+
                 {% if error %}
                     <p class="tl_error">{{ error|trans }}</p>
                 {% endif %}
@@ -65,9 +69,11 @@
                         <fieldset class="tl_checkbox_container">
                             <legend>{{ 'MSC.supertext.targets'|trans }}</legend>
                             {% for root in roots %}
-                                <input type="checkbox" class="tl_checkbox" name="targets[]" id="st_target_{{ root.id }}" value="{{ root.id }}"{% if root.id in selected or (selected is empty and report is null) %} checked{% endif %}>
+                                <input type="checkbox" class="tl_checkbox" name="targets[]" id="st_target_{{ root.id }}" value="{{ root.id }}"{% if not root.supertext %} disabled{% elseif root.id in selected or (selected is empty and report is null) %} checked{% endif %}>
                                 <label for="st_target_{{ root.id }}" class="tl_checkbox_label">
-                                    {{ root.title }} <span class="label-info">[{{ root.language }}]</span>
+                                    {{ root.title }} <span class="label-info">[{{ root.language }}{% if root.supertext and root.supertext|lower != root.language|lower|replace({'_': '-'}) %} → {{ root.supertext }}{% endif %}]</span>
+                                    {% if not root.supertext %}— <span class="tl_red">{{ 'MSC.supertext.notMapped'|trans }}</span>{% endif %}
+                                    {% if root.politeness_unsupported %}— <span class="tl_red">{{ 'MSC.supertext.noPoliteness'|trans }}</span>{% endif %}
                                     {# For a website root the target is the other root, which always exists. #}
                                     {% if page.type != 'root' %}{% if root.targetPageId %}— {{ 'MSC.supertext.exists'|trans }}{% else %}— {{ 'MSC.supertext.new'|trans }}{% endif %}{% endif %}
                                 </label>
@@ -91,12 +97,30 @@
                     {% endif %}
                 {% endif %}
             </div>
+
+            {% if status %}
+                {# Administrators only: the latest automatic API key check and the version reports setting. #}
+                <div class="tl_tbox supertext-status">
+                    <h3>{{ 'MSC.supertext.keyCheck'|trans }}</h3>
+                    {% if status.check is null %}
+                        <p class="tl_info">{{ 'MSC.supertext.notChecked'|trans }}</p>
+                    {% else %}
+                        <p class="{{ status.check.status == 'ok' ? 'tl_confirm' : 'tl_error' }}">
+                            {{ ('MSC.supertext.keycheck_' ~ status.check.status)|trans([status.check.http_status])|raw }}
+                            <em>({{ 'MSC.supertext.checkedAt'|trans([status.check.time]) }})</em>
+                        </p>
+                    {% endif %}
+                    <h3>{{ 'MSC.supertext.reports'|trans }}</h3>
+                    <p>{{ (status.reports ? 'MSC.supertext.reportsOn' : 'MSC.supertext.reportsOff')|trans }}{% if status.reports_env %} (SUPERTEXT_VERSION_REPORTS){% endif %}</p>
+                    <p class="tl_help" style="white-space: normal">{{ 'MSC.supertext.reportsHelp'|trans }}</p>
+                </div>
+            {% endif %}
         </div>
 
         {% if roots is not empty %}
             <div class="tl_formbody_submit">
                 <div class="tl_submit_container">
-                    <button type="submit" class="tl_submit" onclick="this.disabled=true;this.textContent='{{ 'MSC.supertext.running'|trans|e('js') }}';this.form.submit();"{% if not api_key_configured %} disabled{% endif %}>
+                    <button type="submit" class="tl_submit" onclick="this.disabled=true;this.textContent='{{ 'MSC.supertext.running'|trans|e('js') }}';this.form.submit();"{% if not api_key_configured or source_unmapped %} disabled{% endif %}>
                         {{ 'MSC.supertext.submit'|trans }}
                     </button>
                 </div>
