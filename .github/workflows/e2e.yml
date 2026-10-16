@@ -9,6 +9,11 @@ name: E2E
 
 on:
   workflow_dispatch:
+  # A pull request that changes the E2E test itself runs it before merging.
+  pull_request:
+    paths:
+      - 'test/e2e/**'
+      - '.github/workflows/e2e.yml'
   schedule:
     - cron: '17 5 * * 1' # Mondays, 05:17 UTC
   push:
@@ -29,7 +34,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: e2e
+  group: e2e-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -121,9 +126,12 @@ jobs:
 
       - name: Language list against the real API
         if: steps.key.outputs.present == 'true'
+        env:
+          SUPERTEXT_API_KEY: ${{ secrets.SUPERTEXT_API_KEY }}
+          E2E_SOURCE: en
+          E2E_TARGETS: de-CH,fr-CH,it-CH
         run: |
-          docker cp test/e2e/features.php demo-live:/tmp/features.php
-          docker exec demo-live php /tmp/features.php
+          node test/e2e/features.mjs
 
       - name: End-to-end test against the real API
         if: steps.key.outputs.present == 'true'

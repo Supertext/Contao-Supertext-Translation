@@ -154,10 +154,10 @@ Protocol: [Commando-Center-Supertext-Translation](https://github.com/Supertext/C
 
 ## End-to-end tests
 
-The unit and integration tests use fakes. `.github/workflows/e2e.yml` also tests against the **real Supertext API**, so changes on Supertext's side (language codes, regional variants, formatting, rate limits) show up. It runs on every push to `main` that touches the bundle, the demo or the tests, every Monday, and by hand (*Actions → E2E → Run workflow*). It builds the demo image once (Docker layer cache in GitHub Actions) and starts it twice, each with a new database and demo accounts made up for the run:
+The unit and integration tests use fakes. `.github/workflows/e2e.yml` also tests against the **real Supertext API**, so changes on Supertext's side (language codes, regional variants, formatting, rate limits) show up. It runs on every push to `main` that touches the bundle, the demo or the tests, on pull requests that change the E2E test or workflow, every Monday, and by hand (*Actions → E2E → Run workflow*). It builds the demo image once (Docker layer cache in GitHub Actions) and starts it twice, each with a new database and demo accounts made up for the run:
 
 1. **Real API** (repository or organization secret `SUPERTEXT_API_KEY`; without it these steps are skipped with a warning). Version reports are off (`SUPERTEXT_VERSION_REPORTS=0`), so CI runs don't appear in the Commando Center.
-   - `test/e2e/features.php` (in the container) compares the SDK's language lists with the live `GET features` (cost-free): a code the plugin offers that the API no longer lists, or a demo pair (`en` → `de-CH`, `fr-CH`, `it-CH`) the API doesn't offer, fails the run; new codes and a different politeness support are warnings.
+   - `test/e2e/features.mjs` asks the live `GET features` (cost-free, no plugin or SDK code) whether every pair the demo translates (`en` → `de-CH`, `fr-CH`, `it-CH`) is offered; a missing pair fails the run. Whether the plugin's own language list matches the API is the SDK's job (its own tests).
    - `test/e2e/live.mjs` (Playwright): the editor translates the whole English website into every other root through the back end, then the database is checked: every page, article and content element (nested ones included) has a copy, the copies are unpublished, every field is filled and at least 80 % of them changed (page titles like "Home" in German can stay the same), no `data-st-id`/placeholder is left, insert tags, links, bold and italics are kept, the text is in the target language (common words of each language counted) and de-CH has no "ß". Translating again must update the same records (no duplicates). Each run translates the demo site twice into three languages (around 10,000 characters on the key's account).
 2. **Stand-in API**: the docs screenshots (see *Docs screenshots*), so the images don't change with each machine translation. If `docs/images/` changed, a second job pushes the branch `automation/docs-screenshots` and opens (or updates) the pull request "Docs: regenerate screenshots". This needs *Settings → Actions → General → Allow GitHub Actions to create and approve pull requests*.
 
@@ -166,7 +166,7 @@ If a run fails, the artifact `e2e-debug` has the result pages, the demo logs and
 ```bash
 cd test/e2e && npm install
 # fresh demo (new database) with a real SUPERTEXT_API_KEY, e.g. on port 8081
-docker cp features.php <container>:/tmp/features.php && docker exec <container> php /tmp/features.php
+SUPERTEXT_API_KEY=… E2E_TARGETS=de-CH,fr-CH,it-CH node features.mjs
 CONTAO_URL=http://127.0.0.1:8081 DATABASE_URL=mysql://user:pass@127.0.0.1:3306/db \
   EDITOR_EMAIL=… EDITOR_PASSWORD=… npm run live
 ```
