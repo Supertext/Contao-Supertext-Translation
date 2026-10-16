@@ -154,7 +154,12 @@ for (const root of targets) {
 	for (const p of t.pages) {
 		const s = sourcePages.find((x) => x.id === p.supertext_source);
 		if (!s) continue;
-		check(`${tag}: page title "${s.title}" translated`, p.title && p.title !== s.title, p.title);
+		// A single word can be the same in the target language ("Home" in German, "Services"
+		// in French), so a title only has to be filled; unchanged ones count against the ratio below.
+		check(`${tag}: page title "${s.title}" filled`, String(p.title ?? '').trim() !== '', p.title);
+		fields++;
+		if (p.title !== s.title) changed++;
+		else console.log(`note ${tag}: page title "${s.title}" unchanged`);
 		text += ` ${p.title} ${p.description ?? ''}`;
 	}
 	for (const e of t.elements) {
