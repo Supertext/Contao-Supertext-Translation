@@ -5,3 +5,5 @@
 .env
 .env.local
 /test/docs/node_modules/
+/test/e2e/node_modules/
+/test/e2e/artifacts/

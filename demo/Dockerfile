@@ -36,6 +36,9 @@ RUN composer install --no-dev --no-interaction --no-progress --optimize-autoload
 
 COPY demo/docker/php.ini /usr/local/etc/php/conf.d/contao.ini
 COPY demo/docker/apache.conf /etc/apache2/sites-available/000-default.conf
+# Only $PORT (apache.conf): the default "Listen 80" would clash when several demos share
+# a host network (the E2E workflow runs two).
+RUN : > /etc/apache2/ports.conf
 COPY demo/config config
 COPY demo/src src
 COPY demo/docker/entrypoint.sh /usr/local/bin/demo-entrypoint
