@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Supertext\ContaoTranslation\Reporting;
 
 use Doctrine\DBAL\Connection;
-use Supertext\ContaoTranslation\Sdk\V1\ReporterState;
+use Supertext\ContaoTranslation\PluginHealth\ReporterState;
 
 /**
  * Keeps the reporter's state as JSON in one row of `tl_supertext_state` (created by

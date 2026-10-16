@@ -8,7 +8,8 @@ src/
   ContaoManager/Plugin.php         Contao Manager: loads the bundle and config/routes.yaml
   Controller/TranslateController   back-end screen /contao/supertext/translate/{pageId} (GET form, POST run; status box for admins)
   Controller/PingController        public GET /_supertext/ping (Commando Center reachability check)
-  Reporting/Reporting.php          Commando Center: version reports and API key check (the SDK's InstallationReporter)
+  Reporting/Reporting.php          Commando Center: version reports and API key check (Plugin Health's InstallationReporter)
+  Reporting/ReportTransport        sends Plugin Health's reports through SymfonyHttpTransport
   Reporting/DatabaseStateStore     the reporter's state, one JSON row in tl_supertext_state
   EventListener/                   hides the page operation for users without the permission
   Translation/PageTranslator.php   copies a page (+ articles, content elements) into target roots and translates
@@ -22,6 +23,7 @@ src/
   Supertext/SupertextClient.php    the bundle's Supertext client: wraps the SDK, maps its errors
   Supertext/SymfonyHttpTransport   sends the SDK's requests through Contao's Symfony HttpClient
 lib/supertext-sdk/                 Supertext PHP SDK (namespace Supertext\ContaoTranslation\Sdk), copied by scripts/vendor-sdk.sh
+lib/supertext-plugin-health/       Supertext Plugin Health (namespace Supertext\ContaoTranslation\PluginHealth), copied by scripts/vendor-plugin-health.sh
 contao/dca/                        new columns, page operation, permission field, tl_supertext_state
 contao/languages/{en,de,fr,it}/    back-end strings (screen, permission, messages)
 templates/translate.html.twig      back-end screen (@SupertextTranslation)
@@ -76,7 +78,7 @@ AI file translation API v1, same as the WordPress and Payload plugins. Base URLs
 
 ### Supertext SDK (`lib/supertext-sdk`)
 
-The protocol is done by the [Supertext PHP SDK](https://github.com/Supertext/Supertext-API-SDK-and-Guide) (`sdk/php`), the shared client of all Supertext plugins. The bundle ships its own copy in `lib/supertext-sdk/src` with the namespace changed from `Supertext\Sdk` to `Supertext\ContaoTranslation\Sdk`, autoloaded through this bundle's `composer.json`. Sites install only the bundle (also through the Contao Manager), and another extension that ships or requires the SDK can never clash with this copy. `lib/supertext-sdk/COMMIT` names the SDK commit, `VERSION` its version (0.2.1). Everything that talks to the API is in the SDK's `V1` namespace (`Supertext\ContaoTranslation\Sdk\V1\Client`, `Languages`, `InstallationReporter`, …); only `Sdk\Http\*` and `Sdk\Supertext::SDK_VERSION` are version-neutral. The script copies `src/` with its subfolders and rewrites the namespace in code and in class names inside strings. Never edit the copy: fix the SDK repository and copy it again:
+The protocol is done by the [Supertext PHP SDK](https://github.com/Supertext/Supertext-API-SDK-and-Guide) (`sdk/php`), the shared client of all Supertext plugins: it provides the API client and the API key check (`Client::checkApiKey()`, `Protocol::apiKeyFingerprint()`). Version reports are not in the SDK any more (since 0.3.0) but in *Supertext Plugin Health* (below). The bundle ships its own copy in `lib/supertext-sdk/src` with the namespace changed from `Supertext\Sdk` to `Supertext\ContaoTranslation\Sdk`, autoloaded through this bundle's `composer.json`. Sites install only the bundle (also through the Contao Manager), and another extension that ships or requires the SDK can never clash with this copy. `lib/supertext-sdk/COMMIT` names the SDK commit, `VERSION` its version (0.3.0). Everything that talks to the API is in the SDK's `V1` namespace (`Supertext\ContaoTranslation\Sdk\V1\Client`, `Languages`, `ApiKeyCheck`, …); only `Sdk\Http\*` and `Sdk\Supertext::SDK_VERSION` are version-neutral. The script copies `src/` with its subfolders and rewrites the namespace in code and in class names inside strings. Never edit the copy: fix the SDK repository and copy it again:
 
 ```bash
 scripts/vendor-sdk.sh                  # latest main of the SDK repository
@@ -86,6 +88,17 @@ SDK_DIR=../Supertext-API-SDK-and-Guide scripts/vendor-sdk.sh   # a local clone a
 
 Then run the unit tests and PHPStan (which analyses `src/` only), and note the update in `CHANGELOG.md`. This stays so after the SDK is published.
 
+### Supertext Plugin Health (`lib/supertext-plugin-health`)
+
+[Supertext Plugin Health](https://github.com/Supertext/Commando-Center-Supertext-Translation/tree/main/plugin-health) (`plugin-health/php`, lives in the Commando Center repository) sends the version reports to the Supertext Commando Center, reports the result of the SDK's API key check and builds the answer of the ping endpoint (see *Commando Center* below). It has no dependencies and doesn't need the SDK: `Reporting\Reporting` passes it the SDK's key check (`CallableKeyChecker`) and `Supertext::SDK_VERSION`. The bundle ships its own copy in `lib/supertext-plugin-health/src` with the namespace changed from `Supertext\PluginHealth` to `Supertext\ContaoTranslation\PluginHealth`, autoloaded through `composer.json` like the SDK copy. `COMMIT` names the commit, `VERSION` its version (0.1.0). Never edit the copy: fix it in Commando-Center-Supertext-Translation/plugin-health, then copy it again:
+
+```bash
+scripts/vendor-plugin-health.sh plugin-health-v0.1.0   # a release tag (default: main)
+PLUGIN_HEALTH_DIR=../Commando-Center-Supertext-Translation scripts/vendor-plugin-health.sh   # a local clone as it is
+```
+
+Then run the unit tests and PHPStan, and note the update in `CHANGELOG.md`.
+
 `Supertext\SupertextClient` wraps the SDK client: requests go through Contao's Symfony HttpClient (`SymfonyHttpTransport`, so proxy and TLS settings apply and ext-curl isn't needed), the User-Agent is `supertext-sdk-php Contao-Supertext-Translation`, and SDK errors are rethrown as the bundle's `SupertextException` with the same `errorCode`, the HTTP status and the API's detail. `PageTranslator` submits the documents for all target roots first and collects them afterwards, so Supertext works on all languages in parallel.
 
 | Step | Request | Notes |
@@ -94,7 +107,7 @@ Then run the unit tests and PHPStan (which analyses `src/` only), and note the u
 | Poll | `GET translate/ai/file/{id}/status` | `translating`, `done`, `error`, `limit_exceeded`, `deleted` (`collect()`) |
 | Download | `GET translate/ai/file/{id}/translation` | translated HTML (`collect()`) |
 | Delete | `DELETE translate/ai/file/{id}` | always attempted, also after errors (expires after 24 h anyway) |
-| Key check | `GET features` | the SDK's `checkApiKey()`, run by `InstallationReporter` (see *Commando Center*) |
+| Key check | `GET features` | the SDK's `checkApiKey()`, run by Plugin Health's `InstallationReporter` (see *Commando Center*) |
 
 The SDK sends `Authorization: Supertext-Auth-Key <key>` (a pasted prefix is stripped), retries HTTP 429 (`RATE_LIMIT_EXCEEDED`, a per-second limit per key) up to 4 times (`Retry-After` if sent, else 1/2/4/8 s plus jitter, at most 30 s) and never puts the key into messages.
 
@@ -116,14 +129,14 @@ The translate screen shows the code per language (when it differs from the root'
 
 ### Commando Center: version reports, key check, ping
 
-Protocol: [Commando-Center-Supertext-Translation](https://github.com/Supertext/Commando-Center-Supertext-Translation) → `docs/DEVELOPER.md` → *Report protocol*; the SDK's `InstallationReporter` implements it, `Reporting\Reporting` only supplies what Contao knows:
+Protocol: [Commando-Center-Supertext-Translation](https://github.com/Supertext/Commando-Center-Supertext-Translation) → `docs/DEVELOPER.md` → *Report protocol*; Supertext Plugin Health's `InstallationReporter` implements it (with the SDK's `checkApiKey()` as key checker, run against the configured API through Contao's HTTP client), `Reporting\Reporting` only supplies what Contao knows:
 
-- **Setting:** `version_reports` (bundle configuration, default `true`), combined by the SDK's `reportsEnabled()` with `SUPERTEXT_VERSION_REPORTS` (read with `%env(default::…)%`, so `.env.local` works too; a recognised value wins). Off: no reports, ping 404, the key check still runs. `SUPERTEXT_REPORT_URL` sends reports elsewhere (tests, the docs stand-in).
-- **Report fields:** `site_url` = the back-end request's scheme, host and base path; plugin `Contao-Supertext-Translation` with the version Composer installed (`InstalledVersions::getPrettyVersion('supertext/contao-supertext-translation')`, i.e. the Git tag; a leading `v` is dropped); system `Contao` with the version of `contao/core-bundle` (or `contao/contao`); runtime PHP; `callback.url` = the absolute URL of the route `supertext_translation_ping`. Requests go through Contao's HTTP client (`SymfonyHttpTransport`); the key check uses the configured API (`environment`/`api_url`).
+- **Setting:** `version_reports` (bundle configuration, default `true`), combined by Plugin Health's `reportsEnabled()` with `SUPERTEXT_VERSION_REPORTS` (read with `%env(default::…)%`, so `.env.local` works too; a recognised value wins). Off: no reports, ping 404, the key check still runs. `SUPERTEXT_REPORT_URL` sends reports elsewhere (tests, the docs stand-in).
+- **Report fields:** `site_url` = the back-end request's scheme, host and base path; plugin `Contao-Supertext-Translation` with the version Composer installed (`InstalledVersions::getPrettyVersion('supertext/contao-supertext-translation')`, i.e. the Git tag; a leading `v` is dropped); system `Contao` with the version of `contao/core-bundle` (or `contao/contao`); runtime PHP; `callback.url` = the absolute URL of the route `supertext_translation_ping`. `sdk_version` = the SDK's `Supertext::SDK_VERSION`. Requests go through Contao's HTTP client (`SymfonyHttpTransport`, for the reports wrapped in `ReportTransport`); the key check uses the configured API (`environment`/`api_url`).
 - **When:** the bundle has no settings form (settings are in `config/config.yaml`/the environment), so there is no `settings_saved` and no *Test connection*. The translate screen (GET and POST) queues `onRequest` (reports `installed`, `upgraded` or `api_key_check`; checks the key only when its fingerprint changed); a translation whose result has `authentication_failure` queues `authenticationFailed` instead (with the HTTP status). Queued actions run on `kernel.terminate`, after the response has been sent; nothing here ever throws into a request (a broken or missing state table means nothing runs, so nothing is sent twice).
-- **State:** one row (`name = 'reporter'`, JSON in `data`) in `tl_supertext_state`, defined in `contao/dca/tl_supertext_state.php` and created by `contao:migrate` (`DatabaseStateStore`). It holds the reported version set, the last failure time and the latest key check with the key's SHA-256 fingerprint, never the key.
+- **State:** one row (`name = 'reporter'`, JSON in `data`) in `tl_supertext_state`, defined in `contao/dca/tl_supertext_state.php` and created by `contao:migrate` (`DatabaseStateStore`). It holds the reported version set, the last failure time and the latest key check with the key's SHA-256 fingerprint, never the key. It is the same JSON the SDK 0.2 reporter stored, so the switch to Plugin Health sent no new `installed` report.
 - **Display:** administrators see the latest key check (`MSC.supertext.keycheck_<status>`, the center's wording in four languages, with the account and API key links for `invalid`/`missing`) with its time, and the reporting setting, at the bottom of the translate screen.
-- **Ping:** `GET /_supertext/ping` (`PingController`, no `_scope`, so no Contao firewall, session or page cache) returns the SDK's `pingResponse()` as it is: 200 `{"ok":true,"plugin":"Contao-Supertext-Translation","challenge":"…"}` for a challenge matching `^[A-Za-z0-9_-]{16,64}$`, 400 otherwise, 404 with reports off; always `Cache-Control: no-store`.
+- **Ping:** `GET /_supertext/ping` (`PingController`, no `_scope`, so no Contao firewall, session or page cache) returns Plugin Health's `pingResponse()` as it is: 200 `{"ok":true,"plugin":"Contao-Supertext-Translation","challenge":"…"}` for a challenge matching `^[A-Za-z0-9_-]{16,64}$`, 400 otherwise, 404 with reports off; always `Cache-Control: no-store`.
 
 ## Tests
 

@@ -2,22 +2,23 @@
 
 declare(strict_types=1);
 
-namespace Supertext\ContaoTranslation\Sdk\V1;
+namespace Supertext\ContaoTranslation\PluginHealth;
 
-use Supertext\ContaoTranslation\Sdk\Http\CurlTransport;
-use Supertext\ContaoTranslation\Sdk\Http\HttpRequest;
-use Supertext\ContaoTranslation\Sdk\Http\HttpTransport;
-use Supertext\ContaoTranslation\Sdk\Supertext;
+use Supertext\ContaoTranslation\PluginHealth\Http\CurlTransport;
+use Supertext\ContaoTranslation\PluginHealth\Http\HttpRequest;
+use Supertext\ContaoTranslation\PluginHealth\Http\HttpTransport;
 
 /**
- * Version reports to the Supertext Commando Center, the automatic API key check and the callback ping
- * (spec/reporting.json).
+ * Version reports to the Supertext Commando Center, the API key check result and the ping endpoint
+ * (../spec/reporter.json; protocol: the Commando Center's docs/DEVELOPER.md → Report protocol).
  *
  * The reporter keeps no state of its own: the plugin loads its ReporterState, passes it in, and stores
- * the state it gets back (ReporterResult::$state). No method throws: the center is optional, and a
- * failed report is simply tried again an hour later.
+ * the state it gets back (ReporterResult::$state). It never talks to Supertext itself: the plugin passes
+ * a KeyChecker built on the bundled Supertext SDK. No method throws: the center is optional, and a failed
+ * report is simply tried again an hour later.
  *
- * The key is never sent to the center, only whether one is configured and how the check went.
+ * The key is never sent to the center, nor its fingerprint: only whether one is configured and how the
+ * check went.
  */
 final class InstallationReporter
 {
@@ -25,9 +26,6 @@ final class InstallationReporter
 
     /** Seconds a report may take. */
     public const REPORT_TIMEOUT = 3;
-
-    /** Seconds the key check waits for Supertext. */
-    public const KEY_CHECK_TIMEOUT = ApiKeyCheck::TIMEOUT;
 
     /** Seconds without a new report after a failed one (except reportCheck()). */
     public const FAILURE_BACKOFF = 3600;
@@ -40,34 +38,32 @@ final class InstallationReporter
 
     private const CHALLENGE = '/^[A-Za-z0-9_-]{16,64}$/D';
 
+    private const JSON = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE;
+
     /** The URL reports are sent to. */
     public readonly string $reportUrl;
 
     private readonly string $runtimeName;
     private readonly ?string $runtimeVersion;
 
-    /** @var callable(float): void|null */
-    private $sleep;
-
     /** @var callable(): float */
     private $now;
 
     /**
-     * @param bool                          $enabled        the "Send version information to Supertext" setting combined with the environment: see reportsEnabled()
-     * @param string                        $siteUrl        base URL of the installation, as the system knows it
-     * @param string                        $pluginName     the plugin's GitHub repository name, e.g. "Contao-Supertext-Translation"
-     * @param string                        $pluginVersion  from the plugin's official version source
-     * @param string                        $systemName     the CMS, PIM, shop or application, in its own spelling
-     * @param string|null                   $systemVersion  its version, if known
-     * @param string|null                   $runtimeName    default "PHP"
-     * @param string|null                   $runtimeVersion default PHP_VERSION (when $runtimeName is null)
-     * @param string|null                   $sdkVersion     default Supertext::SDK_VERSION
-     * @param string|null                   $callbackUrl    the plugin's public ping endpoint; null for hosted apps without one
-     * @param string|null                   $reportUrl      default SUPERTEXT_REPORT_URL from the environment, else DEFAULT_REPORT_URL
-     * @param HttpTransport|null            $transport      HTTP for the report and the key check; default CurlTransport
-     * @param string                        $apiBaseUrl     Supertext API base URL for the key check
-     * @param (callable(float): void)|null  $sleep          for the key check's 429 retries (for tests)
-     * @param (callable(): float)|null      $now            wall-clock Unix time in seconds (for tests)
+     * @param bool                     $enabled        the "Send version information to Supertext" setting combined with the environment: see reportsEnabled()
+     * @param string                   $siteUrl        base URL of the installation, as the system knows it
+     * @param string                   $pluginName     the plugin's GitHub repository name, e.g. "Contao-Supertext-Translation"
+     * @param string                   $pluginVersion  from the plugin's official version source
+     * @param string                   $systemName     the CMS, PIM, shop or application, in its own spelling
+     * @param KeyChecker               $keyChecker     the bundled SDK's key check: see KeyChecker and CallableKeyChecker
+     * @param string|null              $systemVersion  its version, if known
+     * @param string|null              $sdkVersion     the bundled Supertext SDK's version (its SDK_VERSION); null: no sdk_version in the report
+     * @param string|null              $runtimeName    default "PHP"
+     * @param string|null              $runtimeVersion default PHP_VERSION (when $runtimeName is null)
+     * @param string|null              $callbackUrl    the plugin's public ping endpoint; null for hosted apps without one
+     * @param string|null              $reportUrl      default SUPERTEXT_REPORT_URL from the environment, else DEFAULT_REPORT_URL
+     * @param HttpTransport|null       $transport      HTTP for the report; default CurlTransport
+     * @param (callable(): float)|null $now            wall-clock Unix time in seconds (for tests)
      */
     public function __construct(
         private readonly bool $enabled,
@@ -75,15 +71,14 @@ final class InstallationReporter
         private readonly string $pluginName,
         private readonly string $pluginVersion,
         private readonly string $systemName,
+        private readonly KeyChecker $keyChecker,
         private readonly ?string $systemVersion = null,
+        private readonly ?string $sdkVersion = null,
         ?string $runtimeName = null,
         ?string $runtimeVersion = null,
-        private readonly ?string $sdkVersion = null,
         private readonly ?string $callbackUrl = null,
         ?string $reportUrl = null,
         private readonly ?HttpTransport $transport = null,
-        private readonly string $apiBaseUrl = Protocol::LIVE_BASE_URL,
-        ?callable $sleep = null,
         ?callable $now = null,
     ) {
         if ($runtimeName === null || $runtimeName === '') {
@@ -99,7 +94,6 @@ final class InstallationReporter
             \is_string($env) && trim($env) !== '' => trim($env),
             default => self::DEFAULT_REPORT_URL,
         };
-        $this->sleep = $sleep;
         $this->now = $now ?? static fn (): float => microtime(true);
     }
 
@@ -134,7 +128,7 @@ final class InstallationReporter
      *
      * @param string|null $challenge the `challenge` query parameter
      * @param string      $plugin    the plugin's GitHub repository name
-     * @param bool        $enabled   reportsEnabled()
+     * @param bool        $enabled   reportsEnabled() (or the reporter's enabled())
      */
     public static function pingResponse(?string $challenge, string $plugin, bool $enabled): PingResponse
     {
@@ -145,9 +139,15 @@ final class InstallationReporter
         if ($challenge === null || preg_match(self::CHALLENGE, $challenge) !== 1) {
             return new PingResponse(400, $headers, '{"ok":false}');
         }
-        $body = json_encode(['ok' => true, 'plugin' => $plugin, 'challenge' => $challenge], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        $body = json_encode(['ok' => true, 'plugin' => $plugin, 'challenge' => $challenge], self::JSON);
 
         return new PingResponse(200, $headers, $body === false ? '{"ok":false}' : $body);
+    }
+
+    /** Whether reports are sent (the ping endpoint answers only then). */
+    public function enabled(): bool
+    {
+        return $this->enabled;
     }
 
     /** "<plugin>|<system>|<runtime>" versions (missing parts empty). */
@@ -159,8 +159,7 @@ final class InstallationReporter
     /** After the plugin's settings were saved: checks the key, reports `installed` or `settings_saved`. */
     public function afterSettingsSaved(?ReporterState $state, #[\SensitiveParameter] string $apiKey): ReporterResult
     {
-        $state ??= ReporterState::empty();
-        $current = self::withCheck($state, $this->check($apiKey));
+        $current = ($state ?? ReporterState::empty())->withKeyCheck($this->check($apiKey));
 
         return $this->reportIfDue($current, $current->reportedVersions === null ? self::EVENT_INSTALLED : self::EVENT_SETTINGS_SAVED);
     }
@@ -169,18 +168,18 @@ final class InstallationReporter
     public function onRequest(?ReporterState $state, #[\SensitiveParameter] string $apiKey): ReporterResult
     {
         $current = $state ?? ReporterState::empty();
-        if ($current->keyCheck === null || $current->keyCheck->fingerprint !== Protocol::apiKeyFingerprint($apiKey)) {
-            $current = self::withCheck($current, $this->check($apiKey));
+        if ($current->keyCheck === null || $current->keyCheck->fingerprint !== $this->fingerprint($apiKey)) {
+            $current = $current->withKeyCheck($this->check($apiKey));
         }
 
         return $this->reportIfDue($current, $this->dueEvent($current));
     }
 
-    /** A translation was rejected with 401/403: the key is invalid (no request to Supertext). */
+    /** A translation was rejected with 401/403: the key is invalid (no check against Supertext). */
     public function authenticationFailed(?ReporterState $state, #[\SensitiveParameter] string $apiKey, int $httpStatus = 401): ReporterResult
     {
-        $check = new ApiKeyCheck(ApiKeyCheck::INVALID, $this->timestamp(), $httpStatus, null, Protocol::apiKeyFingerprint($apiKey));
-        $current = self::withCheck($state ?? ReporterState::empty(), $check);
+        $check = new KeyCheck(KeyCheck::INVALID, $this->timestamp(), $httpStatus, null, $this->fingerprint($apiKey));
+        $current = ($state ?? ReporterState::empty())->withKeyCheck($check);
 
         return $this->reportIfDue($current, $this->dueEvent($current));
     }
@@ -188,7 +187,7 @@ final class InstallationReporter
     /** The "Test connection" button: checks the key, reports a change. */
     public function testConnection(?ReporterState $state, #[\SensitiveParameter] string $apiKey): ReporterResult
     {
-        $current = self::withCheck($state ?? ReporterState::empty(), $this->check($apiKey));
+        $current = ($state ?? ReporterState::empty())->withKeyCheck($this->check($apiKey));
 
         return $this->reportIfDue($current, $this->dueEvent($current));
     }
@@ -213,8 +212,10 @@ final class InstallationReporter
             'plugin' => ['name' => $this->pluginName, 'version' => $this->pluginVersion],
             'system' => self::nameVersion($this->systemName, $this->systemVersion),
             'runtime' => self::nameVersion($this->runtimeName, $this->runtimeVersion),
-            'sdk_version' => $this->sdkVersion ?? Supertext::SDK_VERSION,
         ];
+        if ($this->sdkVersion !== null && $this->sdkVersion !== '') {
+            $body['sdk_version'] = $this->sdkVersion;
+        }
         $check = $state->keyCheck;
         if ($check !== null) {
             $body['api_key_configured'] = $check->fingerprint !== '';
@@ -249,26 +250,26 @@ final class InstallationReporter
         return null;
     }
 
-    private function check(#[\SensitiveParameter] string $apiKey): ApiKeyCheck
+    private function check(#[\SensitiveParameter] string $apiKey): KeyCheck
     {
-        $fingerprint = Protocol::apiKeyFingerprint($apiKey);
-        if ($fingerprint === '') {
-            return new ApiKeyCheck(ApiKeyCheck::MISSING, $this->timestamp(), null, null, '');
-        }
         try {
-            $client = new Client(
-                $apiKey,
-                baseUrl: $this->apiBaseUrl,
-                userAgent: $this->pluginName . '/' . $this->pluginVersion,
-                transport: $this->transport,
-                sleep: $this->sleep,
-                now: $this->now,
-            );
-
-            return $client->checkApiKey();
+            $check = KeyCheck::from($this->keyChecker->check($apiKey));
+            if ($check !== null) {
+                return $check;
+            }
         } catch (\Throwable) {
-            // E.g. no ext-curl and no transport.
-            return new ApiKeyCheck(ApiKeyCheck::ERROR, $this->timestamp(), null, null, $fingerprint);
+            // The SDK's check never throws; a plugin's own checker might.
+        }
+
+        return new KeyCheck(KeyCheck::ERROR, $this->timestamp(), null, null, $this->fingerprint($apiKey));
+    }
+
+    private function fingerprint(#[\SensitiveParameter] string $apiKey): string
+    {
+        try {
+            return $this->keyChecker->fingerprint($apiKey);
+        } catch (\Throwable) {
+            return '';
         }
     }
 
@@ -295,15 +296,15 @@ final class InstallationReporter
         $ok = false;
         try {
             $transport = $this->transport ?? new CurlTransport();
-            $body = json_encode($this->buildReport($event, $state), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+            $body = json_encode($this->buildReport($event, $state), self::JSON | JSON_THROW_ON_ERROR);
             $response = $transport->send(new HttpRequest('POST', $this->reportUrl, [
                 'Content-Type' => 'application/json',
                 'Accept' => 'application/json',
-                'User-Agent' => 'supertext-sdk-php ' . $this->pluginName . '/' . $this->pluginVersion,
+                'User-Agent' => 'supertext-plugin-health/' . PluginHealth::PLUGIN_HEALTH_VERSION . ' (php) ' . $this->pluginName . '/' . $this->pluginVersion,
             ], $body, (float) self::REPORT_TIMEOUT));
             $ok = $response->status >= 200 && $response->status < 300;
         } catch (\Throwable) {
-            // Never fails the caller: the center is optional.
+            // Never fails the caller: the center is optional (also: no ext-curl and no transport).
             $ok = false;
         }
         $next = $ok
@@ -313,14 +314,9 @@ final class InstallationReporter
         return new ReporterResult($next, $next->keyCheck, $event, $ok);
     }
 
-    private static function withCheck(ReporterState $state, ApiKeyCheck $check): ReporterState
-    {
-        return new ReporterState($state->reportedVersions, $state->reportedKeyStatus, $state->lastFailureAt, $check);
-    }
-
     private function timestamp(): string
     {
-        return ApiKeyCheck::timestamp(($this->now)());
+        return KeyCheck::timestamp(($this->now)());
     }
 
     /** @return array{name: string, version?: string} */

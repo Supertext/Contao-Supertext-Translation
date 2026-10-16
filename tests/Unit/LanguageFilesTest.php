@@ -75,7 +75,7 @@ final class LanguageFilesTest extends TestCase
     {
         $messages = self::load('en', 'default.php')['MSC']['supertext'];
         $statuses = array_filter(
-            (new \ReflectionClass(\Supertext\ContaoTranslation\Sdk\V1\ApiKeyCheck::class))->getConstants(),
+            (new \ReflectionClass(\Supertext\ContaoTranslation\PluginHealth\KeyCheck::class))->getConstants(),
             static fn (mixed $value): bool => \is_string($value),
         );
 

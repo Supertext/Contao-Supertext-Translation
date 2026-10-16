@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Supertext\ContaoTranslation\Sdk\V1;
 
 /**
- * The result of the automatic API key check (Client::checkApiKey(), spec/reporting.json → apiKeyCheck).
+ * The result of the automatic API key check (Client::checkApiKey(), spec/api-key-check.json).
  *
  * Plugins run the check on every settings save, when a key from the environment changed and on
  * "Test connection", and show the result to administrators. It never contains the key itself, only its

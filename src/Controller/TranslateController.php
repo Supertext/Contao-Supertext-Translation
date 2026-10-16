@@ -11,8 +11,8 @@ use Contao\CoreBundle\Security\DataContainer\ReadAction;
 use Contao\CoreBundle\Security\DataContainer\UpdateAction;
 use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
+use Supertext\ContaoTranslation\PluginHealth\KeyCheck;
 use Supertext\ContaoTranslation\Reporting\Reporting;
-use Supertext\ContaoTranslation\Sdk\V1\ApiKeyCheck;
 use Supertext\ContaoTranslation\Supertext\SupertextClient;
 use Supertext\ContaoTranslation\Translation\Languages;
 use Supertext\ContaoTranslation\Translation\PageTranslator;
@@ -157,7 +157,7 @@ final class TranslateController extends AbstractBackendController
 
         return [
             'check' => null === $check ? null : [
-                'status' => \in_array($check->status, [ApiKeyCheck::OK, ApiKeyCheck::INVALID, ApiKeyCheck::MISSING, ApiKeyCheck::UNREACHABLE], true) ? $check->status : ApiKeyCheck::ERROR,
+                'status' => \in_array($check->status, [KeyCheck::OK, KeyCheck::INVALID, KeyCheck::MISSING, KeyCheck::UNREACHABLE], true) ? $check->status : KeyCheck::ERROR,
                 'time' => self::formatTime($check->checkedAt),
                 'http_status' => null === $check->httpStatus ? '–' : (string) $check->httpStatus,
             ],

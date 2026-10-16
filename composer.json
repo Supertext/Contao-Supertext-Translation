@@ -41,7 +41,8 @@
     "autoload": {
         "psr-4": {
             "Supertext\\ContaoTranslation\\": "src/",
-            "Supertext\\ContaoTranslation\\Sdk\\": "lib/supertext-sdk/src/"
+            "Supertext\\ContaoTranslation\\Sdk\\": "lib/supertext-sdk/src/",
+            "Supertext\\ContaoTranslation\\PluginHealth\\": "lib/supertext-plugin-health/src/"
         }
     },
     "autoload-dev": {

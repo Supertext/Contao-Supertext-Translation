@@ -6,9 +6,10 @@ namespace Supertext\ContaoTranslation\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use Supertext\ContaoTranslation\Controller\PingController;
+use Supertext\ContaoTranslation\PluginHealth\ReporterState;
 use Supertext\ContaoTranslation\Reporting\Reporting;
 use Supertext\ContaoTranslation\Reporting\StateStore;
-use Supertext\ContaoTranslation\Sdk\V1\ReporterState;
+use Supertext\ContaoTranslation\Sdk\Supertext;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -123,6 +124,7 @@ final class ReportingTest extends TestCase
         $this->assertSame('Contao-Supertext-Translation', $report['plugin']['name']);
         $this->assertSame('Contao', $report['system']['name']);
         $this->assertSame('PHP', $report['runtime']['name']);
+        $this->assertSame(Supertext::SDK_VERSION, $report['sdk_version'], 'the bundled SDK');
         $this->assertTrue($report['api_key_configured']);
         $this->assertSame('ok', $report['api_key_check']['status']);
         $this->assertSame('https://www.example.ch/_supertext/ping', $report['callback']['url']);

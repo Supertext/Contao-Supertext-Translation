@@ -6,10 +6,14 @@ namespace Supertext\ContaoTranslation\Reporting;
 
 use Composer\InstalledVersions;
 use Psr\Log\LoggerInterface;
-use Supertext\ContaoTranslation\Sdk\V1\ApiKeyCheck;
-use Supertext\ContaoTranslation\Sdk\V1\InstallationReporter;
-use Supertext\ContaoTranslation\Sdk\V1\PingResponse;
-use Supertext\ContaoTranslation\Sdk\V1\ReporterResult;
+use Supertext\ContaoTranslation\PluginHealth\CallableKeyChecker;
+use Supertext\ContaoTranslation\PluginHealth\InstallationReporter;
+use Supertext\ContaoTranslation\PluginHealth\KeyCheck;
+use Supertext\ContaoTranslation\PluginHealth\PingResponse;
+use Supertext\ContaoTranslation\PluginHealth\ReporterResult;
+use Supertext\ContaoTranslation\Sdk\Supertext;
+use Supertext\ContaoTranslation\Sdk\V1\Client;
+use Supertext\ContaoTranslation\Sdk\V1\Protocol;
 use Supertext\ContaoTranslation\Supertext\SupertextClient;
 use Supertext\ContaoTranslation\Supertext\SymfonyHttpTransport;
 use Symfony\Component\HttpFoundation\Request;
@@ -20,8 +24,9 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 /**
  * Version reports to the Supertext Commando Center, the automatic API key check and the
  * callback ping (Commando-Center-Supertext-Translation → docs/DEVELOPER.md → Report protocol).
- * The protocol is the SDK's (InstallationReporter); this class only gives it what Contao
- * knows: the site URL, the Contao and bundle versions, and a place to keep its state.
+ * The protocol is Supertext Plugin Health's (lib/supertext-plugin-health, InstallationReporter);
+ * the key check is the Supertext SDK's (Client::checkApiKey()). This class only gives them what
+ * Contao knows: the site URL, the Contao and bundle versions, and a place to keep the state.
  *
  * The bundle has no settings form (its settings are in config/config.yaml and the
  * environment), so there is no "settings saved": the key check runs when the key changed
@@ -50,7 +55,7 @@ class Reporting
     /**
      * @param bool|null          $setting      `version_reports` (null: not set, on)
      * @param string|null        $envReports   SUPERTEXT_VERSION_REPORTS (wins over the setting)
-     * @param string|null        $reportUrl    SUPERTEXT_REPORT_URL (tests), else the SDK's default
+     * @param string|null        $reportUrl    SUPERTEXT_REPORT_URL (tests), else Plugin Health's default
      * @param \Closure(): float|null $now      wall-clock time (tests)
      */
     public function __construct(
@@ -77,7 +82,7 @@ class Reporting
     /** Whether the environment variable decides (shown on the status box). */
     public function decidedByEnvironment(): bool
     {
-        // The SDK lets a recognised value of the variable win over either setting.
+        // Plugin Health lets a recognised value of the variable win over either setting.
         return InstallationReporter::reportsEnabled(true, $this->envReports ?? '') === InstallationReporter::reportsEnabled(false, $this->envReports ?? '');
     }
 
@@ -126,12 +131,27 @@ class Reporting
             pluginName: self::PLUGIN_NAME,
             pluginVersion: self::pluginVersion(),
             systemName: 'Contao',
+            keyChecker: $this->keyChecker(),
             systemVersion: self::contaoVersion(),
+            sdkVersion: Supertext::SDK_VERSION,
             callbackUrl: $this->callbackUrl($request),
             reportUrl: null === $this->reportUrl || '' === trim($this->reportUrl) ? null : $this->reportUrl,
-            transport: new SymfonyHttpTransport($this->httpClient),
-            apiBaseUrl: SupertextClient::baseUrl($this->apiUrl, $this->environment),
+            transport: new ReportTransport(new SymfonyHttpTransport($this->httpClient)),
             now: $this->now,
+        );
+    }
+
+    /** The SDK's key check (GET features) against the configured API, through Contao's HttpClient. */
+    private function keyChecker(): CallableKeyChecker
+    {
+        $baseUrl = SupertextClient::baseUrl($this->apiUrl, $this->environment);
+        $transport = new SymfonyHttpTransport($this->httpClient);
+        $userAgent = self::PLUGIN_NAME.'/'.self::pluginVersion();
+        $now = $this->now;
+
+        return new CallableKeyChecker(
+            static fn (string $key) => (new Client($key, $baseUrl, userAgent: $userAgent, transport: $transport, now: $now))->checkApiKey(),
+            [Protocol::class, 'apiKeyFingerprint'],
         );
     }
 
@@ -191,7 +211,7 @@ class Reporting
     }
 
     /** The latest stored key check (for the translate screen), or null. */
-    public function lastCheck(): ApiKeyCheck|null
+    public function lastCheck(): KeyCheck|null
     {
         try {
             return $this->store->load()->keyCheck;

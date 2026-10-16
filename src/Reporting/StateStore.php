@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Supertext\ContaoTranslation\Reporting;
 
-use Supertext\ContaoTranslation\Sdk\V1\ReporterState;
+use Supertext\ContaoTranslation\PluginHealth\ReporterState;
 
 /**
  * Where the Commando Center reporter keeps its state between requests (what was reported

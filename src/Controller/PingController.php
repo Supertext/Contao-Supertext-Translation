@@ -11,7 +11,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 /**
  * Public ping for the Supertext Commando Center: GET /_supertext/ping?challenge=<c> answers
- * {"ok":true,"plugin":"Contao-Supertext-Translation","challenge":"<c>"} (the SDK's answer,
+ * {"ok":true,"plugin":"Contao-Supertext-Translation","challenge":"<c>"} (Supertext Plugin Health's answer,
  * status and headers as given), 400 for an invalid challenge, 404 while version reports
  * are off. No `_scope`: Contao's firewalls, session and page cache don't apply; the answer
  * says Cache-Control: no-store.
