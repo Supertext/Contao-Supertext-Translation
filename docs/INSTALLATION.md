@@ -70,7 +70,30 @@ The bundle's screens, the permission and its messages are available in English, 
 
 ![Settings of the German website root: Language de-CH, Language fallback off](images/07-language-root.png)
 
-Each website root's *Language* needs a Supertext language. Supertext accepts exactly these target codes (from its `features` list, October 2026):
+Each website root's *Language* needs a Supertext language. Choose it in the root's own settings: **Content → Pages → edit the website root (pencil) → section *Supertext***:
+
+![Settings of the German website root, Supertext section: Supertext language "Deutsch (Schweiz) (de-CH)" preselected, Formal or informal "Supertext default"](images/09-root-supertext-language.png)
+
+- **Supertext language**: a select with all of Supertext's languages, shown as "Name (code)" in your back-end language, e.g. *Deutsch (Schweiz) (de-CH)*. It is used for both directions: when this root is translated into, and when it is the source (then without region: `de-CH` → `de`).
+- **Formal or informal**: *Supertext default*, *Formal* (Sie, vous, Lei) or *Informal*. It only appears when the chosen Supertext language offers it (not for English, Swiss German, Romansh, Albanian and Serbian); choosing the Supertext language reloads the form.
+
+The select is **preselected** for every root, so most sites need no setup:
+
+1. the root's language when it is itself a Supertext code (apart from upper/lower case and `_`/`-`): `de-CH`, `fr-CH`, `it-CH`, `es`, `nl`;
+2. else the usual Supertext language for it:
+
+   | Root language | Preselected |
+   | --- | --- |
+   | `de`, `en`, `fr`, `it`, `pt` | `de-DE`, `en-US`, `fr-FR`, `it-IT`, `pt-PT` |
+   | `zh`, `zh-CN`, `zh-SG` / `zh-TW`, `zh-HK`, `zh-MO` | `zh-Hans` / `zh-Hant` |
+   | `sr`, `sr-Latn-RS` | `sr-Latn` |
+   | a region of a language Supertext offers without one | that language: `es-ES` → `es`, `nl-NL` → `nl`, `nb-NO` → `nb` |
+
+3. else **"— choose —"**: Supertext has no usual language for it, e.g. `de-LI`, `en-IE`, `fr-BE`, `gsw` or `sr-RS`. Choose one before translating; until then the translate screen marks the language *no Supertext language yet* (it can't be selected), and nothing is sent for it.
+
+A root that is never saved with another choice keeps following its *Language*: only a Supertext language that differs from the preselected one is stored. The select only accepts Supertext's codes.
+
+Supertext's target codes (from its `features` list, October 2026):
 
 | Language | Supertext codes |
 | --- | --- |
@@ -79,18 +102,13 @@ Each website root's *Language* needs a Supertext language. Supertext accepts exa
 | Swiss German | `gsw-u-sd-chzh` (Zurich), `gsw-u-sd-chbe` (Bern) |
 | All others, without region | `bg`, `cs`, `da`, `el`, `es`, `fi`, `hr`, `hu`, `ja`, `ko`, `nb`, `nl`, `pl`, `rm`, `ru`, `sk`, `sl`, `sq`, `sv`, `tr` |
 
-- A root whose language **is** one of these codes (apart from upper/lower case and `_`/`-`) needs no setup: `de-CH`, `fr-CH`, `it-CH`, `es`, `nl`. The source language is sent without region (`de-CH` → `de`, `en` stays `en`).
-- **Every other language needs an entry in `language_map`**, for example a root with the language `de` (Germany, Switzerland or Austria?), `en` as a target (`en-US` or `en-GB`?), `pt`, `zh-CN` or `no`. The bundle never guesses a region: an unmapped language shows *no Supertext language yet* on the translate screen (it can't be selected), and a translation into it stops with *The language … has no Supertext language yet*; nothing is sent for it.
-- Formal/informal address (`politeness`) isn't offered for English, Swiss German, Romansh, Albanian and Serbian. The translate screen warns when it is set for such a language; leave those on `default`, or Supertext rejects the translation.
-
-Configure both in `config/config.yaml` and clear the cache:
+**Override for automated setups:** `language_map` and `politeness` in `config/config.yaml` win over the roots' settings (clear the cache after changing them). The root's settings then show *Set to … by language_map in config/config.yaml* under the field. Earlier versions only had this configuration: it keeps working as it is, nothing needs to be migrated.
 
 ```yaml
 supertext_translation:
     language_map:
-        de: de-CH           # Contao language => Supertext code (one of the codes above)
+        de-LI: de-CH        # Contao language => Supertext code (one of the codes above)
         en: en-GB           # used for both directions: as the source, en-GB is sent as en
-        zh-CN: zh-Hans
     politeness:
         de-CH: more         # formal ("Sie"); "less" = informal
 ```
@@ -108,8 +126,15 @@ Target languages are the other website roots **of the same domain** (same *Domai
 | `api_key` | `%env(SUPERTEXT_API_KEY)%` | Supertext API key. |
 | `environment` | `live` | `live`, `staging` or `testing` Supertext API. May be an env variable. |
 | `api_url` | `''` | Explicit API base URL (e.g. a proxy); overrides `environment`. |
-| `language_map` | `{}` | Contao language → Supertext code (e.g. `de: de-CH`, `zh-CN: zh-Hans`). Needed for every root language that isn't itself a Supertext code (see [Language setup](#language-setup)); there are no default regions. For the source, the mapped code's language is sent (`de-CH` → `de`). |
-| `politeness` | `{}` | Contao language → `default`, `more` (formal) or `less` (informal). |
+| `language_map` | `{}` | Optional: Contao language → Supertext code (e.g. `de: de-CH`), overrides the website roots' *Supertext language* (see [Language setup](#language-setup)). For the source, the mapped code's language is sent (`de-CH` → `de`). |
+| `politeness` | `{}` | Optional: Contao language → `default`, `more` (formal) or `less` (informal), overrides the roots' *Formal or informal*. Sent as it is, also for a language without formal/informal (the translate screen warns). |
+
+In each website root (Content → Pages → edit the root → *Supertext*):
+
+| Field | Default | Description |
+| --- | --- | --- |
+| *Supertext language* | preselected (see [Language setup](#language-setup)) | Supertext code for this root's language, both directions. Column `tl_page.supertext_language` (`''` = the preselected one). |
+| *Formal or informal* | *Supertext default* | Only shown where the Supertext language offers it. Column `tl_page.supertext_politeness`. |
 | `version_reports` | `true` | *Send version information to Supertext* (see [below](#version-information-and-the-api-key-check)). The environment variable `SUPERTEXT_VERSION_REPORTS` (`0`, `false`, `off`, `no` or `1`, `true`, `on`, `yes`) wins over this setting. |
 | `poll_interval` | `2` | Seconds between status checks while Supertext translates. |
 | `timeout` | `180` | Maximum seconds to wait for one page and language. |
@@ -169,9 +194,10 @@ Remove the package (Contao Manager or `composer remove supertext/contao-supertex
 | "Authentication failure" | Wrong key, or a key for another environment (`live` vs `staging`). Generate a new key at <https://www.supertext.com/en/integrations/api> (Admin role required). |
 | "Too many requests to Supertext" | Supertext's per-second rate limit. Each request is retried up to 4 times automatically; if it still appears, translate fewer languages at once and try again. |
 | "Your Supertext translation limit is exceeded" | The Supertext subscription quota is used up. |
-| *no Supertext language yet* next to a language / "The language … has no Supertext language yet" | The root's language isn't a Supertext code: add it to `language_map` (see [Language setup](#language-setup)) and clear the cache. |
-| "Supertext does not support this language pair" | A mapped code Supertext doesn't offer (e.g. `es-ES` instead of `es`, `zh-CN` instead of `zh-Hans`, or the same language as the source); fix the `language_map` entry. The log has the codes that were sent. |
-| "Supertext offers no formal or informal tone for this language" | `politeness` sets `more`/`less` for a language without it (English, Swiss German, Romansh, Albanian, Serbian); remove that entry. |
+| *no Supertext language yet* next to a language / "The language … has no Supertext language yet" | Supertext has no usual language for the root's language (e.g. `de-LI`, `en-IE`): choose its *Supertext language* in the root's settings (see [Language setup](#language-setup)). |
+| The *Supertext section* is missing in a website root | Run the database update (it adds `supertext_language` and `supertext_politeness` to `tl_page`); non-admin users also need the two fields allowed in their group's *Allowed fields* of pages. |
+| "Supertext does not support this language pair" | A `language_map` code Supertext doesn't offer (e.g. `es-ES` instead of `es`), or source and target are the same language; fix the entry or the roots' *Supertext language*. The log has the codes that were sent. |
+| "Supertext offers no formal or informal tone for this language" | `politeness` in `config/config.yaml` sets `more`/`less` for a language without it (English, Swiss German, Romansh, Albanian, Serbian); remove that entry. (The root's *Formal or informal* is never sent for such a language.) |
 | "Supertext rejected the API key" in the API key check | The key is wrong or revoked. Check that the whole key was copied into `SUPERTEXT_API_KEY`, or generate a new one at <https://www.supertext.com/en/integrations/api> (Admin role required). No Supertext account yet? Create one at <https://www.supertext.com/person/en/account/signin>. Clear the cache and open the translate screen again. |
 | "The API key couldn't be checked because Supertext can't be reached" | The Contao server can't reach `api.supertext.com` (firewall, proxy, DNS). Translations need the same connection. |
 | "Not checked yet" in the API key check | The check runs after the page was sent; reload the screen. If it stays, run the database update (the table `tl_supertext_state` is missing). |

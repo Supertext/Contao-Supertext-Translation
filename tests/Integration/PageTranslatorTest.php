@@ -259,15 +259,43 @@ final class PageTranslatorTest extends TestCase
     public function testLanguageWithoutSupertextCodeFailsAndSendsNothing(): void
     {
         $s = $this->site();
-        // Bare "de" is no Supertext target (de-DE, de-CH or de-AT?): no guessing.
-        $this->db->update('tl_page', ['language' => 'de'], ['id' => $s['de']]);
+        // German (Liechtenstein) has no usual Supertext language (de-DE, de-CH or de-AT?): no guessing.
+        $this->db->update('tl_page', ['language' => 'de-LI'], ['id' => $s['de']]);
         $report = $this->translator()->translatePage($s['about'], [$s['de'], $s['fr']]);
 
         $this->assertSame('unsupported_language', $report->targets[$s['de']]['errorCode']);
-        $this->assertSame(['de'], $report->targets[$s['de']]['errorParams']);
+        $this->assertSame(['de-LI'], $report->targets[$s['de']]['errorParams']);
         $this->assertTrue($report->targets[$s['fr']]['ok'], 'the other languages are translated');
         $this->assertSame(['fr-CH'], array_column($this->fake->submitted, 'target'));
         $this->assertSame(0, (int) $this->db->fetchOne('SELECT COUNT(*) FROM tl_page WHERE pid = ?', [$s['de']]));
+    }
+
+    public function testBareLanguageUsesTheDefault(): void
+    {
+        $s = $this->site();
+        $this->db->update('tl_page', ['language' => 'de'], ['id' => $s['de']]);
+        $report = $this->translator()->translatePage($s['about'], [$s['de']]);
+
+        $this->assertTrue($report->targets[$s['de']]['ok']);
+        $this->assertSame('de-DE', $this->fake->submitted[0]['target']);
+    }
+
+    public function testRootSettingsChooseTheSupertextCodeAndTone(): void
+    {
+        $s = $this->site();
+        $this->db->update('tl_page', ['language' => 'de', 'supertext_language' => 'de-AT', 'supertext_politeness' => 'less'], ['id' => $s['de']]);
+        $this->db->update('tl_page', ['supertext_language' => 'fr-FR', 'supertext_politeness' => 'more'], ['id' => $s['fr']]);
+        $this->db->update('tl_page', ['language' => 'en-IE', 'supertext_language' => 'en-GB'], ['id' => $s['en']]);
+        $report = $this->translator(languages: new Languages(['fr-CH' => 'fr-CH']))->translatePage($s['about'], [$s['de'], $s['fr']]);
+
+        $this->assertTrue($report->targets[$s['de']]['ok']);
+        $this->assertTrue($report->targets[$s['fr']]['ok']);
+        $byTarget = array_column($this->fake->submitted, null, 'target');
+        $this->assertSame('less', $byTarget['de-AT']['politeness'] ?? null, 'the root\'s Supertext language and tone');
+        $this->assertSame('en', $byTarget['de-AT']['source'], 'the source root\'s choice, in its source form');
+        $this->assertArrayHasKey('fr-CH', $byTarget, 'language_map overrides the root\'s choice');
+        $this->assertSame('more', $byTarget['fr-CH']['politeness'] ?? null);
+        $this->assertSame('', $this->row('tl_page', (int) $report->targets[$s['de']]['pages'][0]['id'])['supertext_language'], 'not copied to pages');
     }
 
     public function testLanguageMapChoosesTheSupertextCode(): void

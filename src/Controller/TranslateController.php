@@ -115,10 +115,11 @@ final class TranslateController extends AbstractBackendController
         // Version report and key check, after the response (never slows down or breaks this screen).
         $this->reporting->queue(Reporting::ON_REQUEST, $request);
 
-        // The Supertext code of each language; unmapped languages can't be translated.
+        // The Supertext code of each language (chosen, else exact match, else default); languages
+        // without one can't be translated.
         foreach ($roots as &$root) {
-            $root['supertext'] = $this->languages->targetOrNull($root['language']);
-            $root['politeness_unsupported'] = $this->languages->politenessUnsupported($root['language']);
+            $root['supertext'] = $this->languages->targetOrNull($root['language'], $root['supertextLanguage']);
+            $root['politeness_unsupported'] = $this->languages->politenessUnsupported($root['language'], $root['supertextLanguage']);
         }
         unset($root);
 
@@ -140,7 +141,7 @@ final class TranslateController extends AbstractBackendController
             'error' => $error,
             'api_key_configured' => $this->client->hasApiKey(),
             'source_language' => $sourceLanguage,
-            'source_unmapped' => '' !== $sourceLanguage && null === $this->languages->sourceOrNull($sourceLanguage),
+            'source_unmapped' => '' !== $sourceLanguage && null === $this->languages->sourceOrNull($sourceLanguage, $this->translator->sourceSupertextLanguage($id)),
             'status' => $user->isAdmin ? $this->status() : null,
             'back_url' => $this->generateUrl('contao_backend', ['do' => 'page']),
         ]);

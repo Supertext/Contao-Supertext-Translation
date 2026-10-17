@@ -111,6 +111,12 @@ await admin.goto(`${B}/contao?do=page&act=edit&id=${germanRoot}`);
 const language = admin.locator('#ctrl_language').locator('xpath=ancestor::fieldset[1]');
 await shot(admin, language, '07-language-root.png');
 
+// The root's Supertext section: Supertext language (preselected) and Formal or informal.
+await admin.getByText('Supertext', { exact: true }).first().click().catch(() => {});
+await admin.waitForTimeout(500);
+const supertextLanguage = admin.locator('#ctrl_supertext_language').locator('xpath=ancestor::fieldset[1]');
+await shot(admin, supertextLanguage, '09-root-supertext-language.png');
+
 // Permission in the user group.
 await admin.goto(`${B}/contao?do=group`);
 await admin.getByText('Editors', { exact: true }).first().waitFor();

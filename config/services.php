@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Supertext\ContaoTranslation\Controller\PingController;
 use Supertext\ContaoTranslation\Controller\TranslateController;
+use Supertext\ContaoTranslation\EventListener\RootLanguageListener;
 use Supertext\ContaoTranslation\EventListener\SupertextOperationListener;
 use Supertext\ContaoTranslation\Reporting\DatabaseStateStore;
 use Supertext\ContaoTranslation\Reporting\Reporting;
@@ -57,6 +58,9 @@ return static function (ContainerConfigurator $container): void {
     ;
 
     $services->set(SupertextOperationListener::class);
+
+    // Supertext language and politeness selects in a website root's settings.
+    $services->set(RootLanguageListener::class);
 
     // Commando Center: version reports, API key check, ping (see src/Reporting/Reporting.php).
     $services->set(DatabaseStateStore::class)->args([service('database_connection')]);

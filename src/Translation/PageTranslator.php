@@ -30,7 +30,7 @@ use Supertext\ContaoTranslation\Supertext\SupertextException;
 class PageTranslator
 {
     /** Columns never copied from the source on create/update. */
-    private const SKIP = ['id', 'pid', 'ptable', 'tstamp', 'alias', 'supertext_source', 'languageMain'];
+    private const SKIP = ['id', 'pid', 'ptable', 'tstamp', 'alias', 'supertext_source', 'languageMain', 'supertext_language', 'supertext_politeness'];
 
     /** @var array<string, list<string>> */
     private array $columns = [];
@@ -50,7 +50,7 @@ class PageTranslator
     /**
      * Other website roots of the same site (same domain), in a different language.
      *
-     * @return list<array{id: int, title: string, language: string, targetPageId: int|null}>
+     * @return list<array{id: int, title: string, language: string, supertextLanguage: string, targetPageId: int|null}>
      */
     public function targetRoots(int $pageId): array
     {
@@ -61,7 +61,7 @@ class PageTranslator
         }
 
         $rows = $this->connection->fetchAllAssociative(
-            "SELECT id, title, language FROM tl_page WHERE type = 'root' AND id != ? AND dns = ? AND language != ? ORDER BY sorting",
+            "SELECT * FROM tl_page WHERE type = 'root' AND id != ? AND dns = ? AND language != ? ORDER BY sorting",
             [$root['id'], $root['dns'], $root['language']],
         );
 
@@ -69,6 +69,7 @@ class PageTranslator
             'id' => (int) $r['id'],
             'title' => (string) $r['title'],
             'language' => (string) $r['language'],
+            'supertextLanguage' => (string) ($r['supertext_language'] ?? ''),
             'targetPageId' => $this->findTargetPage($pageId, (int) $r['id']),
         ], $rows);
     }
@@ -171,13 +172,13 @@ class PageTranslator
 
             try {
                 // A language without a Supertext code fails here (unsupported_language); nothing is sent.
-                $target = $this->languages->target((string) $root['language']);
-                $sourceLang = $this->languages->source((string) $sourceRoot['language']);
+                $target = $this->languages->target((string) $root['language'], (string) ($root['supertext_language'] ?? ''));
+                $sourceLang = $this->languages->source((string) $sourceRoot['language'], (string) ($sourceRoot['supertext_language'] ?? ''));
                 $jobs[$rootId] = $this->client->submit(
                     $doc->toHtml(),
                     $target,
                     $sourceLang,
-                    $this->languages->politeness((string) $root['language']),
+                    $this->languages->politeness((string) $root['language'], (string) ($root['supertext_language'] ?? ''), (string) ($root['supertext_politeness'] ?? '')),
                 );
             } catch (SupertextException $e) {
                 $report->fail($rootId, $e->getMessage(), $e->errorCode, $e->messageParams(), $e->detail);
@@ -363,6 +364,12 @@ class PageTranslator
         $root = $this->rootOf($pageId);
 
         return null === $root ? null : (string) $root['language'];
+    }
+
+    /** The Supertext language chosen in the source root's settings ('' = none). */
+    public function sourceSupertextLanguage(int $pageId): string
+    {
+        return (string) ($this->rootOf($pageId)['supertext_language'] ?? '');
     }
 
     /** @return array<string, mixed>|null */

@@ -11,11 +11,12 @@ src/
   Reporting/Reporting.php          Commando Center: version reports and API key check (Plugin Health's InstallationReporter)
   Reporting/ReportTransport        sends Plugin Health's reports through SymfonyHttpTransport
   Reporting/DatabaseStateStore     the reporter's state, one JSON row in tl_supertext_state
-  EventListener/                   hides the page operation for users without the permission
+  EventListener/                   hides the page operation for users without the permission (SupertextOperationListener);
+                                   the website root's Supertext language and politeness selects (RootLanguageListener)
   Translation/PageTranslator.php   copies a page (+ articles, content elements) into target roots and translates
   Translation/ContaoHooks.php      Contao-framework parts: text encoding per field, versions, aliases, cache tags
   Translation/FieldMap.php         translated fields per table (defaults + config overrides)
-  Translation/Languages.php        Contao language → Supertext target/source code (SDK's V1\Languages, language_map), politeness
+  Translation/Languages.php        Contao language → Supertext target/source code (SDK's V1\Languages: language_map, the root's choice, exact, default), politeness, the select's options
   Translation/TranslationReport    result per target root
   Html/SegmentDocument.php         builds/parses the HTML document sent to Supertext
   Html/Protector.php               hides insert tags and basic entities from the translator
@@ -24,7 +25,7 @@ src/
   Supertext/SymfonyHttpTransport   sends the SDK's requests through Contao's Symfony HttpClient
 lib/supertext-sdk/                 Supertext PHP SDK (namespace Supertext\ContaoTranslation\Sdk), copied by scripts/vendor-sdk.sh
 lib/supertext-plugin-health/       Supertext Plugin Health (namespace Supertext\ContaoTranslation\PluginHealth), copied by scripts/vendor-plugin-health.sh
-contao/dca/                        new columns, page operation, permission field, tl_supertext_state
+contao/dca/                        new columns (tl_page.supertext_source/_language/_politeness), page operation, permission field, tl_supertext_state
 contao/languages/{en,de,fr,it}/    back-end strings (screen, permission, messages)
 templates/translate.html.twig      back-end screen (@SupertextTranslation)
 public/supertext.svg               operation icon (bundles/supertexttranslation/)
@@ -78,7 +79,7 @@ AI file translation API v1, same as the WordPress and Payload plugins. Base URLs
 
 ### Supertext SDK (`lib/supertext-sdk`)
 
-The protocol is done by the [Supertext PHP SDK](https://github.com/Supertext/Supertext-API-SDK-and-Guide) (`sdk/php`), the shared client of all Supertext plugins: it provides the API client and the API key check (`Client::checkApiKey()`, `Protocol::apiKeyFingerprint()`). Version reports are not in the SDK any more (since 0.3.0) but in *Supertext Plugin Health* (below). The bundle ships its own copy in `lib/supertext-sdk/src` with the namespace changed from `Supertext\Sdk` to `Supertext\ContaoTranslation\Sdk`, autoloaded through this bundle's `composer.json`. Sites install only the bundle (also through the Contao Manager), and another extension that ships or requires the SDK can never clash with this copy. `lib/supertext-sdk/COMMIT` names the SDK commit, `VERSION` its version (0.3.0). Everything that talks to the API is in the SDK's `V1` namespace (`Supertext\ContaoTranslation\Sdk\V1\Client`, `Languages`, `ApiKeyCheck`, …); only `Sdk\Http\*` and `Sdk\Supertext::SDK_VERSION` are version-neutral. The script copies `src/` with its subfolders and rewrites the namespace in code and in class names inside strings. Never edit the copy: fix the SDK repository and copy it again:
+The protocol is done by the [Supertext PHP SDK](https://github.com/Supertext/Supertext-API-SDK-and-Guide) (`sdk/php`), the shared client of all Supertext plugins: it provides the API client and the API key check (`Client::checkApiKey()`, `Protocol::apiKeyFingerprint()`). Version reports are not in the SDK any more (since 0.3.0) but in *Supertext Plugin Health* (below). The bundle ships its own copy in `lib/supertext-sdk/src` with the namespace changed from `Supertext\Sdk` to `Supertext\ContaoTranslation\Sdk`, autoloaded through this bundle's `composer.json`. Sites install only the bundle (also through the Contao Manager), and another extension that ships or requires the SDK can never clash with this copy. `lib/supertext-sdk/COMMIT` names the SDK commit, `VERSION` its version (0.4.0). Everything that talks to the API is in the SDK's `V1` namespace (`Supertext\ContaoTranslation\Sdk\V1\Client`, `Languages`, `ApiKeyCheck`, …); only `Sdk\Http\*` and `Sdk\Supertext::SDK_VERSION` are version-neutral. The script copies `src/` with its subfolders and rewrites the namespace in code and in class names inside strings. Never edit the copy: fix the SDK repository and copy it again:
 
 ```bash
 scripts/vendor-sdk.sh                  # latest main of the SDK repository
@@ -117,13 +118,25 @@ Error codes (`SupertextException::$errorCode`, the SDK's): `missing_api_key`, `a
 
 Supertext accepts exactly the codes its `GET features` lists (the SDK's `V1\Languages::TARGETS`/`SOURCES`, from the live API): bare sources (`en`, `de`); targets in one exact form each, regional for German, English, French, Italian and Portuguese (`de-CH`, `en-US`, `pt-BR`), with a script for Chinese and Serbian (`zh-Hans`, `sr-Latn`), a dialect for Swiss German (`gsw-u-sd-chzh`), bare for the others (`es`, `nl`, `sl`). Anything else is HTTP 404 `INVALID_LANGUAGE_PAIR`; formal/informal for a target without it (`en-US`, `rm`, …) is HTTP 400 `FEATURE_ERROR` (`unsupported_feature`). No pair within one language.
 
-`Translation\Languages` turns a website root's *Language* into a Supertext code with the SDK's `Languages::target()` / `source()`, **without guessing**, using `language_map` for both directions:
+`Translation\Languages` turns a website root's *Language* into a Supertext code with the SDK's `Languages::target()` / `source()` (SDK 0.4.0), one mapping for both directions:
 
-1. The `language_map` entry wins (keys compared ignoring case and `_`/`-`); its value is sent as it is, so a language Supertext adds later works before the SDK lists it. For the source, a known value is sent in its source form (`en: en-GB` → source `en`).
-2. Else a root language that equals a Supertext code apart from case and `_`/`-` (`de-CH`, `fr_ch` → `fr-CH`, `es`); sources also by their first subtag (`de-CH` → `de`).
-3. Else `SupertextException('unsupported_language')` (the SDK's exception as previous, `messageParams()` = the language). `PageTranslator` resolves the codes before submitting, so that language fails with `MSC.supertext.error_unsupported_language` and nothing is sent; the others go on. There are no default regions: `de` must be mapped (`de-DE`, `de-CH` or `de-AT`).
+1. `language_map` in the bundle configuration wins (keys compared ignoring case and `_`/`-`; for automated setups); its value is sent as it is, so a language Supertext adds later works before the SDK lists it. For the source, a known value is sent in its source form (`en: en-GB` → source `en`).
+2. Else the root's **Supertext language** (`tl_page.supertext_language`), the select in the root's settings (section *Supertext*). `Languages::mapping()` appends it to the configured map only when the configuration has no entry for that language, so the SDK's first match is the configuration.
+3. Else an exact match: a root language that equals a Supertext code apart from case and `_`/`-` (`de-CH`, `fr_ch` → `fr-CH`, `es`); sources also by their first subtag (`de-CH` → `de`).
+4. Else the SDK's default (`Languages::defaultTarget()`): `de` → `de-DE`, `en` → `en-US`, `fr` → `fr-FR`, `it` → `it-IT`, `pt` → `pt-PT`, `zh`/`zh-CN`/`zh-SG` → `zh-Hans`, `zh-TW`/`zh-HK`/`zh-MO` → `zh-Hant`, `sr` → `sr-Latn`, a region of a bare target → the bare target (`es-ES` → `es`).
+5. Else `SupertextException('unsupported_language')` (the SDK's exception as previous, `messageParams()` = the language). `PageTranslator` resolves the codes before submitting, so that language fails with `MSC.supertext.error_unsupported_language` (which says where the select is) and nothing is sent; the others go on. Nothing else is guessed: `de-LI`, `en-IE`, `fr-BE`, `gsw`, `sr-RS` need a choice.
 
-The translate screen shows the code per language (when it differs from the root's language), marks unmapped languages *no Supertext language yet* and disables them, refuses to start when the source root's language is unmapped, and warns when `politeness` is set for a target without formal/informal (`Languages::politenessUnsupported()`; the value is still sent, never dropped silently).
+**The select** (`contao/dca/tl_page.php`, palettes `root` and `rootfallback`, legend `supertext_legend` after `language_legend`; callbacks in `EventListener\RootLanguageListener`, registered with `#[AsCallback]`, same API in Contao 5.7 and 6.0):
+
+- Options: `Languages::targetLabels()` = the SDK's `targetOptions()` as "Name (code)", the name in the back-end user's language from PHP intl (`Locale::getDisplayName`, Supertext's English name for the `gsw-u-sd-*` dialects and when intl has none), sorted by that name (`Collator`). Contao's `chosen` select (searchable), blank option "— choose —" (`MSC.supertext.choose`), `submitOnChange` (so the politeness field appears or disappears).
+- Preselection (`load` callback): the saved code, else `Languages::suggest()` = the SDK's `suggestTarget()` of the root's language (exact match, else default), else blank.
+- Saving (`save` callback): only codes of `Languages::targetCodes()` (else `MSC.supertext.invalidChoice`); the suggestion of the root's (submitted) language is stored as `''`, so an untouched root keeps following its *Language* when that changes.
+- **Formal or informal** (`supertext_politeness`: `default`, `less`, `more`): removed from the palette (`onload`) when the root's Supertext language doesn't offer it (`Languages::supportsPoliteness()`). `Languages::politeness()`: the configuration's `politeness` wins (sent as it is; the translate screen warns via `politenessUnsupported()` if the target has none), else the root's value only if its target offers it (a value left over from another language is not sent), else `default`.
+- A `language_map` / `politeness` entry for the root's language replaces the field's help text with *Set to … by language_map in config/config.yaml* (`onload`).
+- Both columns are in `PageTranslator::SKIP`: never copied to translated pages.
+- Upgrade: no migration. The new columns start empty (= preselected), and an existing `language_map` keeps winning, so nothing configured changes.
+
+The translate screen shows the code per language (when it differs from the root's language), marks languages without a Supertext language (no choice, no exact match, no default) *no Supertext language yet* and disables them, refuses to start when the source root's language has none, and warns when the configuration's `politeness` is set for a target without formal/informal.
 
 `tests/FakeSupertext.php` and the docs stand-in accept only the SDK's codes and answer like the real API (404 `INVALID_LANGUAGE_PAIR`, 400 `FEATURE_ERROR`).
 
@@ -143,10 +156,10 @@ Protocol: [Commando-Center-Supertext-Translation](https://github.com/Supertext/C
 - `tests/Unit/SupertextClientTest` — the bundle's client on top of the SDK through Symfony HttpClient's mock: protocol, multipart fields, status/HTTP error mapping, 429 retries, timeout, runtime environment selection (the SDK's own tests and conformance scenarios run in the SDK repository)
 - `tests/Unit/SegmentDocumentTest` — HTML build/parse, umlauts, insert tags in text and attributes, lost placeholders, field codecs, text encodings of Contao 5 and 6, no object unserialization
 - `tests/Unit/LanguageFilesTest` — `contao/languages/{de,fr,it}` have the same keys, placeholders, HTML tags and URLs as `en`; every error code (all of the SDK's, and the bundle's own) has an `MSC.supertext.error_<code>` message, every key check result a `keycheck_<status>` message (with both links for `invalid`/`missing`)
-- `tests/Unit/LanguagesTest` — language rules: exact Supertext codes (case and `_`/`-` ignored), bare source, regional source → its language, no default regions (`de`, `en`, `es-ES`, `zh-CN` are `unsupported_language` naming the language), `language_map` wins for both directions and is sent as it is, the politeness warning
+- `tests/Unit/LanguagesTest` — language rules: exact Supertext codes (case and `_`/`-` ignored), bare source, regional source → its language, the SDK defaults (`de` → `de-DE`, `es-ES` → `es`, `zh-TW` → `zh-Hant`, also as the select's suggestion), no guessed regions (`en-IE`, `de-LI`, `gsw` are `unsupported_language` naming the language, blank suggestion), the root's choice and `language_map` overriding it (both directions), the root's politeness only where the target offers it, the select's options (all codes, localized names, code shown), the politeness warning
 - `tests/Unit/ReportingTest` — the setting and `SUPERTEXT_VERSION_REPORTS`, the first `installed` report (site URL, plugin, system, callback URL, never the key), nothing sent when nothing changed, a changed key checked again, a 401/403 during translation reported once without calling Supertext, a missing key, reports off (key still checked), the one-hour back-off, broken storage never throws, queued actions run on `kernel.terminate`, ping answers (Supertext and the center are a `MockHttpClient`)
 - `tests/Unit/ConfigurationTest` — config keys like `de-CH` are kept (Symfony would turn dashes into underscores); `version_reports` defaults to on
-- `tests/Integration/PageTranslatorTest` — real Contao + database: translating into several roots, nested elements, insert tags, re-translation updates in place and hides removed elements, missing parents and whole trees, only roots of the same site, Supertext errors per language, field overrides, an unmapped root language (`unsupported_language`, nothing sent, other languages translated), `language_map` (target `de-AT`, source `en` from `en-GB`), the reporter's state in `tl_supertext_state` with one `installed` report to a fake center (Contao version from Composer), and the public ping route through the kernel (no cookie)
+- `tests/Integration/PageTranslatorTest` — real Contao + database: translating into several roots, nested elements, insert tags, re-translation updates in place and hides removed elements, missing parents and whole trees, only roots of the same site, Supertext errors per language, field overrides, a root language without a Supertext language (`de-LI`: `unsupported_language`, nothing sent, other languages translated), a bare `de` sent as `de-DE`, the roots' *Supertext language* and *Formal or informal* (source root's choice in its source form, `language_map` overriding a root, not copied to pages), `language_map` (target `de-AT`, source `en` from `en-GB`), the reporter's state in `tl_supertext_state` with one `installed` report to a fake center (Contao version from Composer), and the public ping route through the kernel (no cookie)
 
 ## CI
 
@@ -250,6 +263,5 @@ Packagist (once registered) picks up the tag; until then installs use the VCS re
 - News, events, FAQ, forms and other tables are not translated yet.
 - Re-translating overwrites manual changes in the translated fields; no change detection or translation memory.
 - Translating starts from pages; no separate operation in the article list.
-- No *Test connection* button and no settings form: the key check runs automatically (see *Commando Center*); settings stay in `config/config.yaml`.
-- The language mapping is configuration (`language_map`), not a back-end form with a list of Supertext languages.
+- No *Test connection* button and no settings form: the key check runs automatically (see *Commando Center*); settings other than the roots' Supertext language and tone stay in `config/config.yaml`.
 - Human (professional) translation orders, as in the WordPress plugin, are not implemented.

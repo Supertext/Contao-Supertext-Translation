@@ -43,14 +43,34 @@ final class LanguagesTest extends TestCase
         $this->assertSame($expected, (new Languages())->target($language));
     }
 
+    /** @return iterable<string, array{string, string}> */
+    public static function defaults(): iterable
+    {
+        // SDK 0.4.0: an unmapped language uses its default where one is obvious.
+        yield 'bare German' => ['de', 'de-DE'];
+        yield 'bare English' => ['en', 'en-US'];
+        yield 'bare Portuguese' => ['pt', 'pt-PT'];
+        yield 'Spanish with a region' => ['es-ES', 'es'];
+        yield 'Chinese (China)' => ['zh-CN', 'zh-Hans'];
+        yield 'Chinese (Taiwan)' => ['zh_TW', 'zh-Hant'];
+        yield 'Serbian' => ['sr', 'sr-Latn'];
+    }
+
+    #[DataProvider('defaults')]
+    public function testDefaultTarget(string $language, string $expected): void
+    {
+        $this->assertSame($expected, (new Languages())->target($language));
+        $this->assertSame($expected, Languages::suggest($language), 'the select preselects the same code');
+    }
+
     /** @return iterable<string, array{string}> */
     public static function unmapped(): iterable
     {
-        // No default regions: these were guessed before (de-DE, es-ES, zh-CN) and Supertext rejects most guesses.
-        yield 'bare German' => ['de'];
-        yield 'bare English' => ['en'];
-        yield 'Spanish with a region' => ['es-ES'];
-        yield 'Chinese with a region' => ['zh-CN'];
+        // No guessed regions: these need a Supertext language.
+        yield 'English (Ireland)' => ['en-IE'];
+        yield 'German (Liechtenstein)' => ['de-LI'];
+        yield 'Swiss German' => ['gsw'];
+        yield 'Serbian (Serbia)' => ['sr-RS'];
         yield 'unknown' => ['xx'];
     }
 
@@ -66,6 +86,8 @@ final class LanguagesTest extends TestCase
         }
 
         $this->assertNull((new Languages())->targetOrNull($language));
+        $this->assertSame('', Languages::suggest($language), 'the select shows "— choose —"');
+        $this->assertSame('en-GB', (new Languages())->target($language, 'en-GB'), 'a chosen Supertext language makes it work');
     }
 
     public function testUnknownSourceIsAnError(): void
@@ -100,6 +122,50 @@ final class LanguagesTest extends TestCase
         $this->assertSame('xx-YY', (new Languages(['xx' => 'xx-YY']))->target('xx'));
     }
 
+    public function testRootChoiceAndConfigurationOverride(): void
+    {
+        $languages = new Languages(['de-CH' => 'de-DE']);
+
+        $this->assertSame('de-AT', $languages->target('de', 'de-AT'), 'the root\'s Supertext language');
+        $this->assertSame('de', $languages->source('de', 'de-AT'));
+        $this->assertSame('nb', $languages->source('no', 'nb'), 'one choice for both directions');
+        $this->assertSame('de-DE', $languages->target('de_CH', 'gsw-u-sd-chzh'), 'language_map overrides the root');
+        $this->assertSame('de-DE', $languages->configured('de_ch'));
+        $this->assertNull($languages->configured('fr-CH'));
+    }
+
+    public function testRootPolitenessOnlyWhereTheTargetOffersIt(): void
+    {
+        $languages = new Languages([], ['fr-CH' => 'less']);
+
+        $this->assertSame('more', $languages->politeness('de', '', 'more'));
+        $this->assertSame('default', $languages->politeness('en', '', 'more'), 'en-US has no formal/informal: not sent');
+        $this->assertSame('default', $languages->politeness('de', 'gsw-u-sd-chzh', 'more'));
+        $this->assertSame('default', $languages->politeness('de', '', 'nonsense'));
+        $this->assertSame('less', $languages->politeness('fr-CH', '', 'more'), 'configuration wins');
+        $this->assertSame('less', $languages->configuredPoliteness('fr-CH'));
+    }
+
+    public function testSelectOptions(): void
+    {
+        $codes = Languages::targetCodes();
+        $this->assertContains('de-CH', $codes);
+        $this->assertContains('gsw-u-sd-chzh', $codes);
+        $this->assertNotContains('de', $codes);
+
+        $labels = Languages::targetLabels('de');
+        $this->assertSame($codes, array_values(array_intersect($codes, array_keys($labels))), 'every code has a label');
+        $this->assertCount(\count($codes), $labels);
+        $this->assertStringEndsWith('(de-CH)', $labels['de-CH'], 'the code is shown next to the name');
+
+        if (class_exists(\Locale::class)) {
+            $this->assertSame('Deutsch (Schweiz) (de-CH)', $labels['de-CH'], 'names in the back-end language');
+            $this->assertSame('Schweizerdeutsch (Zürich) (gsw-u-sd-chzh)', $labels['gsw-u-sd-chzh'], 'dialects: language and place');
+            $this->assertSame('Swiss German (Bern) (gsw-u-sd-chbe)', Languages::targetLabels('en')['gsw-u-sd-chbe']);
+            $this->assertSame('Swiss German (Zurich) (gsw-u-sd-chzh)', Languages::targetLabels('ja')['gsw-u-sd-chzh'], 'Supertext\'s name for other back-end languages');
+        }
+    }
+
     public function testPolitenessWarningOnlyForTargetsWithoutIt(): void
     {
         $languages = new Languages(['en' => 'en-GB'], ['de-CH' => 'more', 'en' => 'more', 'rm' => 'less', 'fr-CH' => 'default']);
@@ -110,6 +176,6 @@ final class LanguagesTest extends TestCase
         $this->assertTrue($languages->politenessUnsupported('en'));
         $this->assertTrue($languages->politenessUnsupported('rm'));
         $this->assertFalse($languages->politenessUnsupported('fr-CH'));
-        $this->assertFalse($languages->politenessUnsupported('de'), 'unmapped: shown as not mapped instead');
+        $this->assertFalse($languages->politenessUnsupported('de-LI'), 'no Supertext language: shown as not mapped instead');
     }
 }

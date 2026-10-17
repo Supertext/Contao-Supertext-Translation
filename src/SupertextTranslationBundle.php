@@ -22,8 +22,8 @@ use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
  *         api_key: '%env(SUPERTEXT_API_KEY)%'   # default
  *         environment: live                     # live | staging | testing (env var OK)
  *         api_url: ''                           # overrides environment (env var OK)
- *         language_map: { de: de-CH }         # Contao language => Supertext code
- *         politeness: { de: more }
+ *         language_map: { de: de-CH }         # optional override of the roots' Supertext language
+ *         politeness: { de: more }            # optional override of the roots' Formal or informal
  *         version_reports: true                 # SUPERTEXT_VERSION_REPORTS=0 also turns it off
  *         poll_interval: 2                      # seconds
  *         timeout: 180                          # seconds per page
