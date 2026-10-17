@@ -115,7 +115,8 @@ async function translateEnglishSite(label) {
 		if (usable) await box.check();
 	}
 	const started = Date.now();
-	await Promise.all([page.waitForNavigation({ timeout: 900_000 }), form.locator('button.tl_submit').click()]);
+	// The click waits for the navigation too: give it the translation's time, not the default 30 s.
+	await Promise.all([page.waitForNavigation({ timeout: 900_000 }), form.locator('button.tl_submit').click({ timeout: 900_000 })]);
 	await page.screenshot({ path: `${artifacts}${label}-result.png`, fullPage: true });
 	const confirms = await form.locator('.tl_confirm').allTextContents();
 	const errors = await form.locator('.tl_error').allTextContents();

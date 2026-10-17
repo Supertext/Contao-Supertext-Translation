@@ -206,7 +206,7 @@ final class Languages
             $lang = substr($locale, 0, 2);
             $city = self::DIALECT_CITIES[substr($code, -4)][$lang] ?? null;
 
-            if (!\is_string($language) || '' === $language || 'gsw' === $language || null === $city) {
+            if ('' === $language || 'gsw' === $language || null === $city) {
                 return $englishName;
             }
 
@@ -215,7 +215,7 @@ final class Languages
             $name = \Locale::getDisplayName(str_replace('-', '_', $code), $locale);
         }
 
-        if (!\is_string($name) || '' === $name || strtolower($name) === strtolower(str_replace('-', '_', $code))) {
+        if ('' === $name || strtolower($name) === strtolower(str_replace('-', '_', $code))) {
             return $englishName;
         }
 
