@@ -11,7 +11,7 @@ declare(strict_types=1);
  *   docker exec demo php /tmp/features.php
  *
  * Errors (exit 1): a code the plugin would send that the API no longer accepts, or a demo
- * pair the API doesn't offer. Warnings only: new codes the plugin doesn't know yet, and a
+ * pair or a default target the API doesn't offer. Warnings only: new codes the plugin doesn't know yet, and a
  * different politeness support. Output uses GitHub Actions annotations.
  * See "End-to-end tests" in docs/DEVELOPER.md.
  */
@@ -70,6 +70,15 @@ foreach (['de-CH', 'fr-CH', 'it-CH'] as $root) {
     $target = Languages::target($root);
     $ok = [] !== array_filter($pairs, static fn ($p) => 'en' === $p->sourceLang && $p->targetLang === $target);
     echo $ok ? "ok   en → $target (demo root $root)\n" : "::error::The API doesn't offer en → $target (demo root $root)\n";
+    $errors += $ok ? 0 : 1;
+}
+
+// The defaults a website root without a chosen Supertext language is sent as (SDK 0.4.0),
+// e.g. de → de-DE, zh-TW → zh-Hant, es-ES → es: each must be a live target.
+foreach (['de', 'en', 'fr', 'it', 'pt', 'zh', 'zh-TW', 'sr', 'es-ES', 'nl-NL'] as $language) {
+    $target = Languages::target($language);
+    $ok = in_array($target, $liveTargets, true);
+    echo $ok ? "ok   default $language → $target\n" : "::error::The default for $language is $target, which the API doesn't list as a target\n";
     $errors += $ok ? 0 : 1;
 }
 

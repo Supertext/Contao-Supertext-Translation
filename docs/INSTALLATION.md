@@ -72,7 +72,7 @@ The bundle's screens, the permission and its messages are available in English, 
 
 Each website root's *Language* needs a Supertext language. Choose it in the root's own settings: **Content → Pages → edit the website root (pencil) → section *Supertext***:
 
-![Settings of the German website root, Supertext section: Supertext language "Deutsch (Schweiz) (de-CH)" preselected, Formal or informal "Supertext default"](images/09-root-supertext-language.png)
+![Settings of the German website root, Supertext section: Supertext language "German (Switzerland) (de-CH)" preselected; Formal or informal with the note that politeness in config/config.yaml overrides it](images/09-root-supertext-language.png)
 
 - **Supertext language**: a select with all of Supertext's languages, shown as "Name (code)" in your back-end language, e.g. *Deutsch (Schweiz) (de-CH)*. It is used for both directions: when this root is translated into, and when it is the source (then without region: `de-CH` → `de`).
 - **Formal or informal**: *Supertext default*, *Formal* (Sie, vous, Lei) or *Informal*. It only appears when the chosen Supertext language offers it (not for English, Swiss German, Romansh, Albanian and Serbian); choosing the Supertext language reloads the form.
