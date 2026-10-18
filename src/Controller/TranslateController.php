@@ -116,7 +116,7 @@ final class TranslateController extends AbstractBackendController
                     ]);
                 }
 
-                $fileError ??= ['MSC.supertext.fileNothing', []];
+                $fileError = ['MSC.supertext.fileNothing', []];
             }
         } elseif ('import' === $action) {
             [$imports, $fileError] = $this->import($request, $user);
