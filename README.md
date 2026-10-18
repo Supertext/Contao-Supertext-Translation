@@ -10,6 +10,8 @@ composer require supertext/contao-supertext-translation
 
 You need a Supertext account ([create one](https://www.supertext.com/person/en/account/signin)) and an API key ([supertext.com → Integrations → API](https://www.supertext.com/en/integrations/api), requires the Admin role); set it as `SUPERTEXT_API_KEY` (see the [Installation guide](docs/INSTALLATION.md#api-key)).
 
+**Export for translation** (XLIFF 1.2 or HTML) and **Import translation** let you translate a page outside the API, with a translator, a translation tool or Supertext's web app.
+
 Formatting, links and insert tags are kept; translated pages are linked for the language switcher (terminal42/contao-changelanguage); previous versions stay restorable.
 
 **Live demo:** <https://contao-production.up.railway.app/contao> (credentials from the Supertext team)

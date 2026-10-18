@@ -12,7 +12,9 @@ use Supertext\ContaoTranslation\Reporting\Reporting;
 use Supertext\ContaoTranslation\Supertext\SupertextClient;
 use Supertext\ContaoTranslation\Tests\FakeSupertext;
 use Supertext\ContaoTranslation\Translation\ContaoHooks;
+use Supertext\ContaoTranslation\Sdk\Files\TranslationFiles;
 use Supertext\ContaoTranslation\Translation\FieldMap;
+use Supertext\ContaoTranslation\Translation\FileExchange;
 use Supertext\ContaoTranslation\Translation\Languages;
 use Supertext\ContaoTranslation\Translation\PageTranslator;
 use Symfony\Component\Dotenv\Dotenv;
@@ -221,6 +223,46 @@ final class PageTranslatorTest extends TestCase
         // Whole tree from the root
         $all = $this->translator(new FakeSupertext())->translatePage($s['en'], [$s['de']]);
         $this->assertSame(3, \count($all->targets[$s['de']]['pages']));
+    }
+
+    public function testTranslationFileRoundTrip(): void
+    {
+        $s = $this->site();
+        $translator = $this->translator();
+        $exchange = new FileExchange($translator, new Languages());
+
+        $file = $exchange->export($s['about'], [$s['fr']], FileExchange::FORMAT_XLIFF);
+        $this->assertSame('contao-'.$s['about'].'-fr-CH.xlf', $file['filename']);
+        $translated = (string) preg_replace_callback('~<source>(.*?)</source>~s', static fn ($m) => '<source>'.$m[1].'</source><target>'.str_replace(['About', 'We '], ['FR About', 'FR We '], $m[1]).'</target>', $file['content']);
+
+        $result = $exchange->import(TranslationFiles::read($translated)[0], false, static fn () => true);
+
+        $this->assertNull($result['error'], json_encode($result));
+        $this->assertSame([], $this->fake->calls(static fn () => true), 'no API call');
+        $fr = $this->row('tl_page', (int) $result['targetPageId']);
+        $this->assertSame($s['fr'], (int) $fr['pid']);
+        $this->assertSame(0, (int) $fr['published'], 'new translations are unpublished');
+        $this->assertSame('FR About & us', html_entity_decode($fr['title']));
+
+        $article = (int) $this->db->fetchOne('SELECT id FROM tl_article WHERE pid = ?', [$fr['id']]);
+        $text = (string) $this->db->fetchOne("SELECT text FROM tl_content WHERE ptable = 'tl_article' AND pid = ? AND type = 'text'", [$article]);
+        $this->assertStringContainsString('{{link_url::'.$s['home'].'}}', $text, 'insert tags restored');
+        $this->assertStringContainsString('FR We', $text);
+
+        // A text translated by hand afterwards is kept when the file has no translation for it.
+        $this->db->update('tl_page', ['title' => 'Von Hand'], ['id' => $fr['id']]);
+        $teaserOnly = (string) preg_replace_callback(
+            '~(<trans-unit id="([^"]+)"[^>]*>\s*<source>(.*?)</source>)~s',
+            static fn ($m) => str_starts_with($m[2], 'a.') ? $m[1].'<target>FR2 '.$m[3].'</target>' : $m[1],
+            $exchange->export($s['about'], [$s['fr']], FileExchange::FORMAT_XLIFF)['content'],
+        );
+        $second = $exchange->import(TranslationFiles::read($teaserOnly)[0], false, static fn () => true);
+
+        $this->assertSame($fr['id'], $second['targetPageId']);
+        $this->assertGreaterThan(0, $second['counts']['untranslated']);
+        $this->assertSame('Von Hand', $this->row('tl_page', (int) $fr['id'])['title']);
+        $this->assertStringContainsString('FR2', (string) $this->db->fetchOne('SELECT teaser FROM tl_article WHERE id = ?', [$article]));
+        $this->assertStringContainsString('FR We', (string) $this->db->fetchOne("SELECT text FROM tl_content WHERE ptable = 'tl_article' AND pid = ? AND type = 'text'", [$article]), 'untranslated element keeps its translation');
     }
 
     public function testOnlyOffersLanguageRootsOfTheSameSite(): void

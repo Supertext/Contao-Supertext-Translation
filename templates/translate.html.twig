@@ -127,4 +127,100 @@
             </div>
         {% endif %}
     </form>
+    {% if roots is not empty or imports is not null %}
+        {# Export for translation / Import translation: files translated outside the API. #}
+        <form method="post" class="tl_form tl_edit_form supertext-export" data-turbo="false">
+            <div class="tl_formbody_edit">
+                <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                <input type="hidden" name="action" value="export">
+                <div class="tl_tbox">
+                    <h2 class="sub_headline">{{ 'MSC.supertext.fileExport'|trans }}</h2>
+
+                    {% if file_error and file_action == 'export' %}
+                        <p class="tl_error">{{ file_error[0]|trans(file_error[1]) }}</p>
+                    {% endif %}
+
+                    {% if page.type == 'root' %}
+                        <p class="tl_info">{{ 'MSC.supertext.fileRoot'|trans }}</p>
+                    {% else %}
+                        <div class="widget">
+                            <fieldset class="tl_radio_container">
+                                <legend>{{ 'MSC.supertext.fileFormat'|trans }}</legend>
+                                <input type="radio" class="tl_radio" name="format" id="st_format_xliff" value="xliff" checked>
+                                <label for="st_format_xliff">{{ 'MSC.supertext.fileXliff'|trans }}</label><br>
+                                <input type="radio" class="tl_radio" name="format" id="st_format_html" value="html">
+                                <label for="st_format_html">{{ 'MSC.supertext.fileHtml'|trans }}</label>
+                            </fieldset>
+                        </div>
+                        <div class="widget">
+                            <fieldset class="tl_checkbox_container">
+                                <legend>{{ 'MSC.supertext.fileTargets'|trans }}</legend>
+                                {% for root in roots %}
+                                    <input type="checkbox" class="tl_checkbox" name="export_targets[]" id="st_export_{{ root.id }}" value="{{ root.id }}">
+                                    <label for="st_export_{{ root.id }}" class="tl_checkbox_label">{{ root.title }} <span class="label-info">[{{ root.language }}{% if root.supertext and root.supertext|lower != root.language|lower|replace({'_': '-'}) %} → {{ root.supertext }}{% endif %}]</span></label><br>
+                                {% endfor %}
+                            </fieldset>
+                            <p class="tl_help" style="white-space: normal">{{ 'MSC.supertext.fileExportHelp'|trans }}</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% if page.type != 'root' %}
+                <div class="tl_formbody_submit">
+                    <div class="tl_submit_container">
+                        <button type="submit" class="tl_submit">{{ 'MSC.supertext.fileDownload'|trans }}</button>
+                    </div>
+                </div>
+            {% endif %}
+        </form>
+
+        <form method="post" enctype="multipart/form-data" class="tl_form tl_edit_form supertext-import" data-turbo="false">
+            <div class="tl_formbody_edit">
+                <input type="hidden" name="REQUEST_TOKEN" value="{{ contao.request_token }}">
+                <input type="hidden" name="action" value="import">
+                <div class="tl_tbox">
+                    <h2 class="sub_headline">{{ 'MSC.supertext.fileImport'|trans }}</h2>
+
+                    {% if file_error and file_action == 'import' %}
+                        <p class="tl_error">{{ file_error[0]|trans(file_error[1]) }}</p>
+                    {% endif %}
+
+                    {% for result in imports ?? [] %}
+                        {% if result.error %}
+                            <p class="tl_error"><strong>{{ result.page }} ({{ result.language }})</strong>: {{ ('MSC.supertext.' ~ result.error)|trans(result.errorParams) }}</p>
+                        {% else %}
+                            <div class="{{ result.imported ? 'tl_confirm' : 'tl_info' }}">
+                                <strong>{{ result.page }} → {{ result.root }} ({{ result.language }})</strong>
+                                {% if result.targetPageId %} — <a href="{{ path('contao_backend', {do: 'article', pn: result.targetPageId}) }}">{{ 'MSC.supertext.fileOpen'|trans }}</a>{% endif %}
+                                <ul>
+                                    <li>{{ 'MSC.supertext.fileOk'|trans([result.imported]) }}</li>
+                                    {% if result.counts.source_changed and result.imported < result.counts.ok + result.counts.source_changed %}<li>{{ 'MSC.supertext.fileChanged'|trans([result.counts.source_changed]) }}</li>{% endif %}
+                                    {% if result.counts.untranslated %}<li>{{ 'MSC.supertext.fileUntranslated'|trans([result.counts.untranslated]) }}</li>{% endif %}
+                                    {% if result.counts.invalid_markup %}<li>{{ 'MSC.supertext.fileInvalid'|trans([result.counts.invalid_markup]) }}</li>{% endif %}
+                                    {% if result.counts.missing %}<li>{{ 'MSC.supertext.fileMissing'|trans([result.counts.missing]) }}</li>{% endif %}
+                                </ul>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+
+                    <div class="widget">
+                        <h3><label for="st_file">{{ 'MSC.supertext.fileField'|trans }}</label></h3>
+                        <input type="file" name="translation_file" id="st_file" class="tl_upload_field" accept=".xlf,.xliff,.html,.htm,application/x-xliff+xml,text/html" required>
+                        <p class="tl_help" style="white-space: normal">{{ 'MSC.supertext.fileImportHelp'|trans }}</p>
+                    </div>
+                    <div class="widget">
+                        <div class="tl_checkbox_single_container">
+                            <input type="checkbox" class="tl_checkbox" name="include_changed" id="st_include_changed" value="1">
+                            <label for="st_include_changed">{{ 'MSC.supertext.fileIncludeChanged'|trans }}</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="tl_formbody_submit">
+                <div class="tl_submit_container">
+                    <button type="submit" class="tl_submit">{{ 'MSC.supertext.fileImport'|trans }}</button>
+                </div>
+            </div>
+        </form>
+    {% endif %}
 {% endblock %}

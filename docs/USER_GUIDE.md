@@ -31,6 +31,37 @@ The new pages appear in each language's tree, unpublished (crossed-out eye):
 
 ![Translate screen for a page that is already translated: every language shows "translation exists, will be updated"](images/04-retranslate-warning.png)
 
+## Translate with a file (XLIFF or HTML)
+
+Instead of translating with Supertext's API, you can download a page's texts as a file, have them translated elsewhere (a translator, a translation tool such as Trados, memoQ or Phrase, or Supertext's web app) and import the translated file again. The translations are written exactly like a translation with Supertext (see *Review and publish*).
+
+**Export for translation:** open the translate screen of the page (translate icon) and scroll to **Export for translation**.
+
+1. Choose the **File format**:
+   - **XLIFF 1.2 (for translation tools)**: the better choice for translators and translation tools; formatting, links and insert tags appear as protected tags. One file can hold several languages.
+   - **HTML (one language per file)**: for Supertext's web app or anyone who translates HTML. Choose exactly one language.
+2. Tick the **target languages** and click **Download file**. The file is called e.g. `contao-12-fr-CH.xlf` (page ID and language; `contao-12.xlf` for several languages).
+
+The file holds the page, its articles and content elements (not its subpages: export them one by one). A page without texts gives *Nothing to translate.* A website root has no texts of its own.
+
+**Send it for translation.** Translators must keep the file's structure: in an HTML file the head (the `supertext:` meta tags) and the `data-st-id` attributes must stay as they are. An HTML file can't mark a text as untranslated: imported unchanged, it writes the source text into the translation.
+
+**Import translation:** on the translate screen of the page (any page of the website works; the file says which page and language it belongs to), under **Import translation**, choose the **Translated file (XLIFF or HTML)** and click **Import translation**. Files up to 10 MB.
+
+By default, texts whose source was edited after the export are skipped, so an old translation doesn't replace a newer text. Tick **Also import texts whose source changed since the export** to import them anyway.
+
+The summary shows, per page and language:
+
+| Line | Meaning |
+| --- | --- |
+| *Imported: n* | Texts written into the translation. |
+| *Skipped, source changed since the export: n* | The source text was edited after the export; tick the option above to import them anyway, or export again. |
+| *Not translated in the file: n* | The file has no translation for these texts (XLIFF). |
+| *Formatting changed, not imported: n* | The translation broke or added formatting (tags); fix it in the file or translate these texts again. |
+| *Not in the file: n* | Texts added since the export; translate them with Supertext or export again. |
+
+Texts that weren't imported keep their current translation (a new page gets the source text for them, unpublished). Errors: *This file isn't a valid XLIFF or HTML translation file*, *This file wasn't exported by the Supertext extension, or its header was removed*, *The file is too large (at most 10 MB)*, *This file belongs to another system (…)* (exported by another Supertext plugin), *The page this file was exported from no longer exists*, *The site has no language …* (its website root was removed or changed its language), *You may not edit the language … of this website*.
+
 ## Review and publish
 
 - **New pages are created unpublished** (grey, crossed-out eye in the site structure). Check them, adjust if needed, then publish them like any other page: open the page settings (pencil), tick **Publish page** and save.

@@ -62,6 +62,8 @@ Administrators can always translate. For other users:
 
 The *Translate with Supertext* icon only appears for users with the permission, and the translate screen only offers languages whose website root the user may edit.
 
+**Export for translation / Import translation** (XLIFF 1.2 or HTML files, on the translate screen) need the same permission. An import writes only into pages the user may read and language roots the user may edit; each page and language in the file is checked. Uploads are limited to 10 MB (also keep PHP's `upload_max_filesize` and `post_max_size` at least that large, or larger files are refused earlier) and are only read in memory, never stored. There is nothing to configure, and no API key is needed for files.
+
 ## Interface languages
 
 The bundle's screens, the permission and its messages are available in English, German, French and Italian. They follow each back-end user's language (user menu → *Profile* → *Back end language*); other languages fall back to English. This is independent of the website languages below.
@@ -203,6 +205,8 @@ Remove the package (Contao Manager or `composer remove supertext/contao-supertex
 | "Not checked yet" in the API key check | The check runs after the page was sent; reload the screen. If it stays, run the database update (the table `tl_supertext_state` is missing). |
 | "Timed out waiting…" | Very long page or slow service: raise `timeout`, and the web server timeouts. |
 | "Insert tags were moved to the end…" | The translation lost the position of an insert tag; it was appended so nothing breaks. Check the text. |
+| "The file is too large (at most 10 MB)" for a smaller file | PHP's `upload_max_filesize` or `post_max_size` is lower than the file; raise them. |
+| "This file belongs to another system" / "This file wasn't exported by the Supertext extension" | The file was exported by another Supertext plugin, or the translation tool removed the file's header (HTML: the `supertext:` meta tags; XLIFF: the `<file>` attributes). Export again and keep them. |
 | Language switcher doesn't show a translation | The translated page is still unpublished, or changelanguage isn't installed. |
 
 Errors are also written to the Contao system log.

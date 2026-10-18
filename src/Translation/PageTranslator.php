@@ -126,34 +126,13 @@ class PageTranslator
      */
     private function translateOne(int $pageId, array $sourceRoot, array $targetRootIds, TranslationReport $report): void
     {
-        $page = $this->page($pageId);
+        $collected = $this->collect($pageId);
 
-        if (null === $page) {
+        if (null === $collected) {
             return;
         }
 
-        $isRoot = 'root' === $page['type'];
-        $articles = $isRoot ? [] : $this->connection->fetchAllAssociative('SELECT * FROM tl_article WHERE pid = ? ORDER BY sorting', [$pageId]);
-        $elements = [];
-
-        foreach ($articles as $article) {
-            $elements = [...$elements, ...$this->elementsOf('tl_article', (int) $article['id'])];
-        }
-
-        // One document for the page and everything on it.
-        $doc = new SegmentDocument();
-
-        if (!$isRoot) {
-            $this->addRecord($doc, 'tl_page', 'p', $page);
-        }
-
-        foreach ($articles as $article) {
-            $this->addRecord($doc, 'tl_article', 'a', $article);
-        }
-
-        foreach ($elements as $element) {
-            $this->addRecord($doc, 'tl_content', 'c', $element);
-        }
+        ['page' => $page, 'articles' => $articles, 'elements' => $elements, 'doc' => $doc] = $collected;
 
         // Submit for every target first, so Supertext works on all languages in parallel.
         $jobs = [];
@@ -218,8 +197,9 @@ class PageTranslator
      * @param list<array<string, mixed>> $elements
      * @param array<string, mixed>       $sourceRoot
      * @param array<string, string>      $tr
+     * @param bool                       $keepUntranslated existing translations keep fields without a text in $tr (imported files)
      */
-    private function write(array $page, array $articles, array $elements, array $sourceRoot, int $rootId, array $tr, TranslationReport $report): void
+    private function write(array $page, array $articles, array $elements, array $sourceRoot, int $rootId, array $tr, TranslationReport $report, bool $keepUntranslated = false): void
     {
         $pageId = (int) $page['id'];
         $tags = [];
@@ -247,7 +227,7 @@ class PageTranslator
                 $targetPageId = $this->insert('tl_page', $row);
                 $this->connection->update('tl_page', ['alias' => $this->hooks->pageAlias($targetPageId, (string) $row['title'])], ['id' => $targetPageId]);
             } else {
-                $this->update('tl_page', $targetPageId, $this->translatedFields('tl_page', 'p', $page, $tr));
+                $this->update('tl_page', $targetPageId, $this->translatedFields('tl_page', 'p', $page, $tr, $keepUntranslated));
             }
 
             $report->targets[$rootId]['pages'][] = [
@@ -264,7 +244,7 @@ class PageTranslator
         foreach ($articles as $article) {
             $sourceId = (int) $article['id'];
             $targetId = $this->findChild('tl_article', $targetPageId, null, $sourceId);
-            $row = $this->translatedRow('tl_article', 'a', $article, $tr);
+            $row = $this->translatedRow('tl_article', 'a', $article, $tr, $keepUntranslated && null !== $targetId);
             $row['pid'] = $targetPageId;
 
             if (null === $targetId) {
@@ -297,7 +277,7 @@ class PageTranslator
             }
 
             $targetId = $this->findChild('tl_content', $targetParent, $element['ptable'], $sourceId);
-            $row = $this->translatedRow('tl_content', 'c', $element, $tr);
+            $row = $this->translatedRow('tl_content', 'c', $element, $tr, $keepUntranslated && null !== $targetId);
             $row['pid'] = $targetParent;
             $row['ptable'] = $element['ptable'];
 
@@ -324,6 +304,85 @@ class PageTranslator
         }
 
         $this->hooks->invalidate($tags);
+    }
+
+    /**
+     * The segments of one page (without subpages) as the API translation sends them:
+     * the page, its articles and content elements. Also what goes into a translation file.
+     */
+    public function segments(int $pageId): SegmentDocument|null
+    {
+        return $this->collect($pageId)['doc'] ?? null;
+    }
+
+    /**
+     * Writes translations imported from a translation file into one target root, with the
+     * same rules as API results (new pages unpublished, existing ones updated in place,
+     * version history, removed elements hidden). Unlike API results, fields of existing
+     * translations without an imported text keep their current translation.
+     *
+     * @param array<string, string> $translations segment key => protected HTML, keyed like {@see segments()}
+     */
+    public function writeImported(int $pageId, int $targetRootId, array $translations): TranslationReport
+    {
+        $report = new TranslationReport();
+        $collected = $this->collect($pageId) ?? throw new \InvalidArgumentException(\sprintf('Page %d does not exist.', $pageId));
+        $sourceRoot = $this->rootOf($pageId) ?? throw new \InvalidArgumentException(\sprintf('Page %d is not inside a website root.', $pageId));
+        $root = array_column($this->targetRoots($pageId), null, 'id')[$targetRootId]
+            ?? throw new \InvalidArgumentException(\sprintf('Page %d is not a language root of this website.', $targetRootId));
+        $report->start($root);
+
+        ['page' => $page, 'articles' => $articles, 'elements' => $elements, 'doc' => $doc] = $collected;
+        $restored = $doc->restore($translations);
+
+        try {
+            $this->connection->transactional(
+                fn () => $this->write($page, $articles, $elements, $sourceRoot, $targetRootId, $restored, $report, true),
+            );
+        } catch (TranslationException $e) {
+            $report->fail($targetRootId, $e->getMessage(), $e->errorCode, $e->params);
+        }
+
+        return $report;
+    }
+
+    /**
+     * A page with its articles and content elements, and the document of their texts.
+     *
+     * @return array{page: array<string, mixed>, articles: list<array<string, mixed>>, elements: list<array<string, mixed>>, doc: SegmentDocument}|null
+     */
+    private function collect(int $pageId): array|null
+    {
+        $page = $this->page($pageId);
+
+        if (null === $page) {
+            return null;
+        }
+
+        $isRoot = 'root' === $page['type'];
+        $articles = $isRoot ? [] : $this->connection->fetchAllAssociative('SELECT * FROM tl_article WHERE pid = ? ORDER BY sorting', [$pageId]);
+        $elements = [];
+
+        foreach ($articles as $article) {
+            $elements = [...$elements, ...$this->elementsOf('tl_article', (int) $article['id'])];
+        }
+
+        // One document for the page and everything on it.
+        $doc = new SegmentDocument();
+
+        if (!$isRoot) {
+            $this->addRecord($doc, 'tl_page', 'p', $page);
+        }
+
+        foreach ($articles as $article) {
+            $this->addRecord($doc, 'tl_article', 'a', $article);
+        }
+
+        foreach ($elements as $element) {
+            $this->addRecord($doc, 'tl_content', 'c', $element);
+        }
+
+        return ['page' => $page, 'articles' => $articles, 'elements' => $elements, 'doc' => $doc];
     }
 
     /** Page in the given target root that is the translation of $sourcePageId. */
@@ -356,6 +415,14 @@ class PageTranslator
         }
 
         return null;
+    }
+
+    /** A page's title (entities decoded), or null when the page doesn't exist. */
+    public function pageTitle(int $pageId): string|null
+    {
+        $page = $this->page($pageId);
+
+        return null === $page ? null : html_entity_decode((string) $page['title'], ENT_QUOTES | ENT_HTML5);
     }
 
     /** Language of the website root a page belongs to, or null. */
@@ -456,12 +523,20 @@ class PageTranslator
         }
     }
 
-    /** @return array<string, mixed> translated fields only */
-    private function translatedFields(string $table, string $prefix, array $row, array $tr): array
+    /**
+     * @param bool $onlyTranslated leave out fields without any text in $tr (they keep the target's value)
+     *
+     * @return array<string, mixed> translated fields only
+     */
+    private function translatedFields(string $table, string $prefix, array $row, array $tr, bool $onlyTranslated = false): array
     {
         $out = [];
 
         foreach ($this->fields->fieldsFor($table) as $field => $type) {
+            if ($onlyTranslated && !self::hasTranslation($prefix.'.'.$row['id'].'.'.$field, $tr)) {
+                continue;
+            }
+
             if (\array_key_exists($field, $row)) {
                 $out[$field] = FieldCodec::apply($type, $prefix.'.'.$row['id'].'.'.$field, $row[$field], $tr, $this->encoding($table, $field));
             }
@@ -470,13 +545,37 @@ class PageTranslator
         return $out;
     }
 
-    /** @return array<string, mixed> full copy of the source row with translated fields */
-    private function translatedRow(string $table, string $prefix, array $row, array $tr): array
+    /**
+     * @param bool $onlyTranslated leave out translatable fields without any text in $tr (they keep the target's value)
+     *
+     * @return array<string, mixed> full copy of the source row with translated fields
+     */
+    private function translatedRow(string $table, string $prefix, array $row, array $tr, bool $onlyTranslated = false): array
     {
         $copy = array_diff_key($row, array_flip(self::SKIP));
         $copy['tstamp'] = time();
 
-        return [...$copy, ...$this->translatedFields($table, $prefix, $row, $tr)];
+        if ($onlyTranslated) {
+            $copy = array_diff_key($copy, $this->fields->fieldsFor($table));
+        }
+
+        return [...$copy, ...$this->translatedFields($table, $prefix, $row, $tr, $onlyTranslated)];
+    }
+
+    /** Whether $tr has a text for the field $key or one of its parts (`$key.value`, `$key.0`, …). */
+    private static function hasTranslation(string $key, array $tr): bool
+    {
+        if (isset($tr[$key])) {
+            return true;
+        }
+
+        foreach (array_keys($tr) as $k) {
+            if (str_starts_with((string) $k, $key.'.')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function findChild(string $table, int $pid, string|null $ptable, int $sourceId): int|null

@@ -12,6 +12,7 @@ use Supertext\ContaoTranslation\Reporting\StateStore;
 use Supertext\ContaoTranslation\Supertext\SupertextClient;
 use Supertext\ContaoTranslation\Translation\ContaoHooks;
 use Supertext\ContaoTranslation\Translation\FieldMap;
+use Supertext\ContaoTranslation\Translation\FileExchange;
 use Supertext\ContaoTranslation\Translation\Languages;
 use Supertext\ContaoTranslation\Translation\PageTranslator;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
@@ -51,6 +52,9 @@ return static function (ContainerConfigurator $container): void {
     ;
 
     $services->set(PageTranslator::class)->public();
+
+    // Export for translation / Import translation (XLIFF and HTML files).
+    $services->set(FileExchange::class);
 
     $services->set(TranslateController::class)
         ->arg('$logger', service('monolog.logger.contao.error')->nullOnInvalid())

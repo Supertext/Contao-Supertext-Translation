@@ -56,6 +56,39 @@ final class SegmentDocument
         return array_keys($this->segments);
     }
 
+    /**
+     * The segments as they go into the document: Contao syntax (insert tags, basic
+     * entities) replaced by placeholders (see {@see Protector}). Also what goes into
+     * translation files.
+     *
+     * @return array<string, string> key => protected HTML
+     */
+    public function segments(): array
+    {
+        return $this->segments;
+    }
+
+    /**
+     * Puts imported translations (protected HTML, keyed like {@see segments()}) back
+     * into Contao syntax, through the same parser as API results.
+     *
+     * @param array<string, string> $translations
+     *
+     * @return array<string, string> key => HTML with insert tags restored
+     */
+    public function restore(array $translations): array
+    {
+        $body = '';
+
+        foreach ($translations as $key => $html) {
+            if (isset($this->segments[$key])) {
+                $body .= \sprintf("<div %s=\"%s\">%s</div>\n", self::ID_ATTRIBUTE, htmlspecialchars((string) $key, ENT_QUOTES), $html);
+            }
+        }
+
+        return '' === $body ? [] : $this->parse("<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"></head><body>\n".$body.'</body></html>')['translations'];
+    }
+
     public function toHtml(): string
     {
         $body = '';
