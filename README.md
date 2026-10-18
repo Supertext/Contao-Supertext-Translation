@@ -16,6 +16,17 @@ Formatting, links and insert tags are kept; translated pages are linked for the 
 
 **Live demo:** <https://contao-production.up.railway.app/contao> (credentials from the Supertext team)
 
+## Export for translation and import (XLIFF and HTML)
+
+Besides translating with Supertext AI, you can export a page as a file, have it translated elsewhere and import the result.
+
+- **Where:** the page's *Translate with Supertext* screen (the translate icon in the site structure).
+- **Formats:** XLIFF 1.2 for translation tools such as Trados, memoQ or Phrase (formatting travels as protected tags; several target languages in one file), or HTML (one language per file) for translators or Supertext's web app, which keeps the file's head and `data-st-id` attributes, so the translated file imports as it is.
+- **Import:** the file says what it was exported from and for which language. The translations are written with the same rules as a Supertext AI translation, and a summary shows what was imported and what was skipped: source changed since the export (import those anyway with *Also import texts whose source changed since the export*), not translated, formatting changed, not in the file.
+- **Safe:** files over 10 MB, files from another system and translations that add markup the source doesn't have are refused; uploaded files aren't stored.
+
+Details: [user guide](docs/USER_GUIDE.md#translate-with-a-file-xliff-or-html).
+
 ## Guides
 
 - [Installation guide](docs/INSTALLATION.md) — requirements, install, API key, permissions, languages, all settings, troubleshooting
