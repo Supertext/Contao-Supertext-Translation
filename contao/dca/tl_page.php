@@ -27,11 +27,19 @@ $GLOBALS['TL_DCA']['tl_page']['fields']['supertext_politeness'] = [
     'sql' => ['type' => 'string', 'length' => 8, 'default' => 'default'],
 ];
 
+// Website roots: translations into this root go through Supertext's review service
+// (SupertextClient::forReview, bundle setting review_url).
+$GLOBALS['TL_DCA']['tl_page']['fields']['supertext_review'] = [
+    'inputType' => 'checkbox',
+    'eval' => ['tl_class' => 'clr'],
+    'sql' => ['type' => 'boolean', 'default' => false],
+];
+
 foreach (['root', 'rootfallback'] as $palette) {
     if (isset($GLOBALS['TL_DCA']['tl_page']['palettes'][$palette])) {
         PaletteManipulator::create()
             ->addLegend('supertext_legend', 'language_legend', PaletteManipulator::POSITION_AFTER)
-            ->addField(['supertext_language', 'supertext_politeness'], 'supertext_legend', PaletteManipulator::POSITION_APPEND)
+            ->addField(['supertext_language', 'supertext_politeness', 'supertext_review'], 'supertext_legend', PaletteManipulator::POSITION_APPEND)
             ->applyToPalette($palette, 'tl_page')
         ;
     }

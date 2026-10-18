@@ -32,6 +32,7 @@ return static function (ContainerConfigurator $container): void {
             param('supertext_translation.environment'),
             param('supertext_translation.poll_interval_ms'),
             param('supertext_translation.timeout_ms'),
+            param('supertext_translation.review_url'),
         ])
     ;
 

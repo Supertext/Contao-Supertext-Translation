@@ -22,11 +22,11 @@ src/
   Html/SegmentDocument.php         builds/parses the HTML document sent to Supertext
   Html/Protector.php               hides insert tags and basic entities from the translator
   Html/FieldCodec.php              field value ⇄ segments (text, html, inputUnit, list, table)
-  Supertext/SupertextClient.php    the bundle's Supertext client: wraps the SDK, maps its errors
+  Supertext/SupertextClient.php    the bundle's Supertext client: wraps the SDK, maps its errors; forReview() for roots with Translation review
   Supertext/SymfonyHttpTransport   sends the SDK's requests through Contao's Symfony HttpClient
 lib/supertext-sdk/                 Supertext PHP SDK (namespace Supertext\ContaoTranslation\Sdk), copied by scripts/vendor-sdk.sh
 lib/supertext-plugin-health/       Supertext Plugin Health (namespace Supertext\ContaoTranslation\PluginHealth), copied by scripts/vendor-plugin-health.sh
-contao/dca/                        new columns (tl_page.supertext_source/_language/_politeness), page operation, permission field, tl_supertext_state
+contao/dca/                        new columns (tl_page.supertext_source/_language/_politeness/_review), page operation, permission field, tl_supertext_state
 contao/languages/{en,de,fr,it}/    back-end strings (screen, permission, messages)
 templates/translate.html.twig      back-end screen (@SupertextTranslation)
 public/supertext.svg               operation icon (bundles/supertexttranslation/)
@@ -113,7 +113,9 @@ PLUGIN_HEALTH_DIR=../Commando-Center-Supertext-Translation scripts/vendor-plugin
 
 Then run the unit tests and PHPStan, and note the update in `CHANGELOG.md`.
 
-`Supertext\SupertextClient` wraps the SDK client: requests go through Contao's Symfony HttpClient (`SymfonyHttpTransport`, so proxy and TLS settings apply and ext-curl isn't needed), the User-Agent is `supertext-sdk-php Contao-Supertext-Translation`, and SDK errors are rethrown as the bundle's `SupertextException` with the same `errorCode`, the HTTP status and the API's detail. `PageTranslator` submits the documents for all target roots first and collects them afterwards, so Supertext works on all languages in parallel.
+`Supertext\SupertextClient` wraps the SDK client: requests go through Contao's Symfony HttpClient (`SymfonyHttpTransport`, so proxy and TLS settings apply and ext-curl isn't needed), the User-Agent is `supertext-sdk-php Contao-Supertext-Translation/<version>` (the version as in the reports), and SDK errors are rethrown as the bundle's `SupertextException` with the same `errorCode`, the HTTP status and the API's detail. `PageTranslator` submits the documents for all target roots first and collects them afterwards, so Supertext works on all languages in parallel.
+
+**Translation review** (`tl_page.supertext_review`, per target root): `PageTranslator` takes `SupertextClient::forReview($root['supertext_review'])` for each target, a second SDK client with the same key and settings whose base URL is `review_url` (default `SupertextClient::REVIEW_URL`, the translation proxy of [Supertext Localization Review](https://github.com/Supertext/Localization-Review-Supertext-Translation)); the job is collected with the client that submitted it. The proxy speaks the same API v1, forwards to the live Supertext API with the plugin's key, stores every segment per key and serves reviewers' corrections on the next upload, so nothing else changes in the bundle. `review_url: ''` (or the same URL as the API) means `forReview()` always returns the direct client. The key check, reports and file export/import never use the review service. The column is never copied to translated pages.
 
 | Step | Request | Notes |
 | --- | --- | --- |
@@ -166,14 +168,14 @@ Protocol: [Commando-Center-Supertext-Translation](https://github.com/Supertext/C
 
 ## Tests
 
-- `tests/Unit/SupertextClientTest` — the bundle's client on top of the SDK through Symfony HttpClient's mock: protocol, multipart fields, status/HTTP error mapping, 429 retries, timeout, runtime environment selection (the SDK's own tests and conformance scenarios run in the SDK repository)
+- `tests/Unit/SupertextClientTest` — the bundle's client on top of the SDK through Symfony HttpClient's mock: protocol, multipart fields, status/HTTP error mapping, 429 retries, timeout, runtime environment selection, the review service client (`forReview`, default `REVIEW_URL`, off with an empty URL) (the SDK's own tests and conformance scenarios run in the SDK repository)
 - `tests/Unit/SegmentDocumentTest` — HTML build/parse, umlauts, insert tags in text and attributes, lost placeholders, field codecs, text encodings of Contao 5 and 6, no object unserialization
 - `tests/Unit/LanguageFilesTest` — `contao/languages/{de,fr,it}` have the same keys, placeholders, HTML tags and URLs as `en`; every error code (all of the SDK's, and the bundle's own) has an `MSC.supertext.error_<code>` message, every key check result a `keycheck_<status>` message (with both links for `invalid`/`missing`)
 - `tests/Unit/LanguagesTest` — language rules: exact Supertext codes (case and `_`/`-` ignored), bare source, regional source → its language, the SDK defaults (`de` → `de-DE`, `es-ES` → `es`, `zh-TW` → `zh-Hant`, also as the select's suggestion), no guessed regions (`en-IE`, `de-LI`, `gsw` are `unsupported_language` naming the language, blank suggestion), the root's choice and `language_map` overriding it (both directions), the root's politeness only where the target offers it, the select's options (all codes, localized names, code shown), the politeness warning
 - `tests/Unit/ReportingTest` — the setting and `SUPERTEXT_VERSION_REPORTS`, the first `installed` report (site URL, plugin, system, callback URL, never the key), nothing sent when nothing changed, a changed key checked again, a 401/403 during translation reported once without calling Supertext, a missing key, reports off (key still checked), the one-hour back-off, broken storage never throws, queued actions run on `kernel.terminate`, ping answers (Supertext and the center are a `MockHttpClient`)
 - `tests/Unit/FileExchangeTest` — translation files: the reference format round trip, the export uses the collector's keys and the language mapping (unmapped languages with their Contao code), HTML only for one language, nothing to export, import writes `ok` texts (insert tags restored), `source_changed` only with the option, `untranslated`/`invalid_markup`/`missing` not written, other plugins, unknown pages, missing languages and forbidden roots refused, write errors reported, files over the size limit refused (with a fake `PageTranslator`)
-- `tests/Unit/ConfigurationTest` — config keys like `de-CH` are kept (Symfony would turn dashes into underscores); `version_reports` defaults to on
-- `tests/Integration/PageTranslatorTest` — real Contao + database: translating into several roots, nested elements, insert tags, re-translation updates in place and hides removed elements, missing parents and whole trees, only roots of the same site, Supertext errors per language, field overrides, a root language without a Supertext language (`de-LI`: `unsupported_language`, nothing sent, other languages translated), a bare `de` sent as `de-DE`, the roots' *Supertext language* and *Formal or informal* (source root's choice in its source form, `language_map` overriding a root, not copied to pages), `language_map` (target `de-AT`, source `en` from `en-GB`), the reporter's state in `tl_supertext_state` with one `installed` report to a fake center (Contao version from Composer), and the public ping route through the kernel (no cookie)
+- `tests/Unit/ConfigurationTest` — config keys like `de-CH` are kept (Symfony would turn dashes into underscores); `version_reports` defaults to on; `review_url` defaults to Supertext's review service
+- `tests/Integration/PageTranslatorTest` — real Contao + database: translating into several roots, nested elements, insert tags, re-translation updates in place and hides removed elements, missing parents and whole trees, only roots of the same site, Supertext errors per language, field overrides, a root language without a Supertext language (`de-LI`: `unsupported_language`, nothing sent, other languages translated), a bare `de` sent as `de-DE`, a root with *Translation review* goes through the review service (all four calls) while the others go directly, not copied to pages, the roots' *Supertext language* and *Formal or informal* (source root's choice in its source form, `language_map` overriding a root, not copied to pages), `language_map` (target `de-AT`, source `en` from `en-GB`), the reporter's state in `tl_supertext_state` with one `installed` report to a fake center (Contao version from Composer), and the public ping route through the kernel (no cookie)
 
 ## CI
 
@@ -213,7 +215,8 @@ Variables (documented in `demo/.env.example`):
 | --- | --- |
 | `DATABASE_URL` | `mysql://user:pass@host:3306/db` (MySQL 8.4 or MariaDB; not MySQL 9) (or Railway's `MYSQLHOST`, `MYSQLUSER`, … are combined by the entrypoint) |
 | `APP_SECRET` | random string |
-| `SUPERTEXT_API_KEY`, `SUPERTEXT_ENVIRONMENT`, `SUPERTEXT_API_URL` | Supertext |
+| `SUPERTEXT_API_KEY`, `SUPERTEXT_ENVIRONMENT`, `SUPERTEXT_API_URL` | Supertext (`SUPERTEXT_API_URL` overrides the environment; to try the review service, tick *Translation review* in the roots instead) |
+| `SUPERTEXT_REVIEW_URL` | optional: another review service than Supertext's (`review_url`; empty keeps the default) |
 | `SUPERTEXT_VERSION_REPORTS` | `0` turns the version reports off (default on) |
 | `SUPERTEXT_REPORT_URL` | only for tests and screenshots: where reports go instead of the Commando Center (e.g. the docs stand-in's `/report`) |
 | `DEMO_ADMIN_EMAIL`, `DEMO_ADMIN_PASSWORD`, `DEMO_EDITOR_EMAIL`, `DEMO_EDITOR_PASSWORD` | demo accounts |
@@ -276,7 +279,7 @@ Packagist (once registered) picks up the tag; until then installs use the VCS re
 
 - Runs in the request (like the WordPress plugin). Next: Contao's job queue (5.7+, `@experimental`) for whole-site translations with progress.
 - News, events, FAQ, forms and other tables are not translated yet.
-- Re-translating overwrites manual changes in the translated fields; no change detection or translation memory.
+- Re-translating overwrites manual changes in the translated fields; no change detection. A translation memory and reviewers' corrections come from the review service when a root has *Translation review* on; corrections reach Contao only with the next translation (no push).
 - Translating starts from pages; no separate operation in the article list.
-- No *Test connection* button and no settings form: the key check runs automatically (see *Commando Center*); settings other than the roots' Supertext language and tone stay in `config/config.yaml`.
+- No *Test connection* button and no settings form: the key check runs automatically (see *Commando Center*); settings other than the roots' Supertext language, tone and *Translation review* stay in `config/config.yaml`.
 - Human (professional) translation orders, as in the WordPress plugin, are not implemented.

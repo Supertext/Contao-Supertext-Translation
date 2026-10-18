@@ -30,7 +30,7 @@ use Supertext\ContaoTranslation\Supertext\SupertextException;
 class PageTranslator
 {
     /** Columns never copied from the source on create/update. */
-    private const SKIP = ['id', 'pid', 'ptable', 'tstamp', 'alias', 'supertext_source', 'languageMain', 'supertext_language', 'supertext_politeness'];
+    private const SKIP = ['id', 'pid', 'ptable', 'tstamp', 'alias', 'supertext_source', 'languageMain', 'supertext_language', 'supertext_politeness', 'supertext_review'];
 
     /** @var array<string, list<string>> */
     private array $columns = [];
@@ -135,7 +135,9 @@ class PageTranslator
         ['page' => $page, 'articles' => $articles, 'elements' => $elements, 'doc' => $doc] = $collected;
 
         // Submit for every target first, so Supertext works on all languages in parallel.
+        // Roots with *Translation review* on go through the review service.
         $jobs = [];
+        $clients = [];
 
         foreach ($targetRootIds as $rootId) {
             if (!$report->targets[$rootId]['ok']) {
@@ -153,7 +155,8 @@ class PageTranslator
                 // A language without a Supertext code fails here (unsupported_language); nothing is sent.
                 $target = $this->languages->target((string) $root['language'], (string) ($root['supertext_language'] ?? ''));
                 $sourceLang = $this->languages->source((string) $sourceRoot['language'], (string) ($sourceRoot['supertext_language'] ?? ''));
-                $jobs[$rootId] = $this->client->submit(
+                $clients[$rootId] = $this->client->forReview((bool) ($root['supertext_review'] ?? false));
+                $jobs[$rootId] = $clients[$rootId]->submit(
                     $doc->toHtml(),
                     $target,
                     $sourceLang,
@@ -169,7 +172,7 @@ class PageTranslator
                 $translations = [];
 
                 if (null !== $fileId) {
-                    $parsed = $doc->parse($this->client->collect($fileId));
+                    $parsed = $doc->parse($clients[$rootId]->collect($fileId));
                     $translations = $parsed['translations'];
                     $report->targets[$rootId]['missing'] = [...$report->targets[$rootId]['missing'], ...$parsed['missing']];
 

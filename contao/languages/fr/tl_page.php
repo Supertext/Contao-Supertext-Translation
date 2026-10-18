@@ -6,6 +6,7 @@ $GLOBALS['TL_LANG']['tl_page']['supertext'] = ['Traduire avec Supertext', 'Tradu
 $GLOBALS['TL_LANG']['tl_page']['supertext_legend'] = 'Supertext';
 $GLOBALS['TL_LANG']['tl_page']['supertext_language'] = ['Langue Supertext', 'La langue vers et depuis laquelle Supertext traduit ce point de départ. Est présélectionnée la langue Supertext correspondante ou la langue usuelle (fr → français (France)) ; choisissez-en une autre si nécessaire, p. ex. français (Suisse). « — choisir — » : Supertext n\'a pas de langue usuelle pour cette langue, choisissez-en une avant de traduire.'];
 $GLOBALS['TL_LANG']['tl_page']['supertext_politeness'] = ['Formel ou informel', 'Le ton dans les traductions vers cette langue.'];
+$GLOBALS['TL_LANG']['tl_page']['supertext_review'] = ['Révision des traductions', 'Les traductions vers ce point de départ passent par le service de révision de Supertext, afin que les réviseurs puissent les vérifier et les corriger directement sur le site avec l\'extension Supertext Localization Review. Leurs corrections sont reprises lors de la prochaine traduction de la page.'];
 $GLOBALS['TL_LANG']['tl_page']['supertext_politeness_options']['default'] = 'Par défaut de Supertext';
 $GLOBALS['TL_LANG']['tl_page']['supertext_politeness_options']['less'] = 'Informel (tu)';
 $GLOBALS['TL_LANG']['tl_page']['supertext_politeness_options']['more'] = 'Formel (vous)';

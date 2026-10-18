@@ -181,4 +181,35 @@ final class SupertextClientTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         SupertextClient::create($http, 'k', '', 'prod');
     }
+
+    public function testReviewGoesThroughTheReviewService(): void
+    {
+        $fake = new FakeSupertext();
+        $client = new SupertextClient($fake->client(), 'test-key', 'https://api.test/v1', 1000, 10_000, static function (): void {}, 'https://review.test/v1/');
+
+        $this->assertSame($client, $client->forReview(false));
+        $review = $client->forReview(true);
+        $this->assertNotSame($client, $review);
+        $this->assertSame($review, $client->forReview(true), 'one review client');
+
+        $this->assertStringContainsString('[de-CH] Hallo', $review->translateHtml('<div data-st-id="a">Hallo</div>', 'de-CH'));
+        $this->assertSame([], array_filter($fake->calls, static fn ($c) => !str_starts_with($c['url'], 'https://review.test/v1/')), 'every call to the review service, with the same key');
+
+        $client->validateApiKey();
+        $this->assertSame('https://api.test/v1/features', end($fake->calls)['url']);
+    }
+
+    public function testReviewOffWithoutReviewUrl(): void
+    {
+        $http = (new FakeSupertext())->client();
+        $client = new SupertextClient($http, 'test-key', 'https://api.test/v1');
+        $this->assertSame($client, $client->forReview(true));
+
+        $fake = new FakeSupertext();
+        SupertextClient::create($fake->client(), 'test-key', '', 'live')->forReview(true)->validateApiKey();
+        $this->assertSame(SupertextClient::REVIEW_URL.'features', $fake->calls[0]['url'], 'Supertext\'s review service by default');
+
+        $client = SupertextClient::create($http, 'test-key', '', 'live', reviewUrl: '');
+        $this->assertSame($client, $client->forReview(true), 'empty review_url: review off everywhere');
+    }
 }

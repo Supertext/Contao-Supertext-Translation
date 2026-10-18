@@ -69,7 +69,7 @@ final class PageTranslatorTest extends TestCase
     private function translator(FakeSupertext|null $fake = null, array $fieldOverrides = [], Languages|null $languages = null): PageTranslator
     {
         $container = self::$kernel->getContainer();
-        $client = new SupertextClient(($fake ?? $this->fake)->client(), 'test-key', 'https://api.test/v1', 1000, 10_000, static function (): void {});
+        $client = new SupertextClient(($fake ?? $this->fake)->client(), 'test-key', 'https://api.test/v1', 1000, 10_000, static function (): void {}, 'https://review.test/v1/');
         $hooks = new ContaoHooks($container->get('contao.framework'), $this->db, $container->get('contao.slug'));
 
         return new PageTranslator($this->db, $client, new FieldMap($fieldOverrides), $languages ?? new Languages([], ['de-CH' => 'more']), $hooks);
@@ -338,6 +338,26 @@ final class PageTranslatorTest extends TestCase
         $this->assertArrayHasKey('fr-CH', $byTarget, 'language_map overrides the root\'s choice');
         $this->assertSame('more', $byTarget['fr-CH']['politeness'] ?? null);
         $this->assertSame('', $this->row('tl_page', (int) $report->targets[$s['de']]['pages'][0]['id'])['supertext_language'], 'not copied to pages');
+    }
+
+    public function testRootsWithTranslationReviewGoThroughTheReviewService(): void
+    {
+        $s = $this->site();
+        $this->db->update('tl_page', ['supertext_review' => 1], ['id' => $s['de']]);
+        $report = $this->translator()->translatePage($s['about'], [$s['de'], $s['fr']]);
+
+        $this->assertTrue($report->targets[$s['de']]['ok']);
+        $this->assertTrue($report->targets[$s['fr']]['ok']);
+        $hosts = [];
+
+        foreach ($this->fake->calls as $call) {
+            $hosts[(string) parse_url($call['url'], \PHP_URL_HOST)][] = $call['method'];
+        }
+
+        $this->assertSame(['POST', 'GET', 'GET', 'DELETE'], $hosts['review.test'] ?? null, 'German: upload, status, download and delete through the review service');
+        $this->assertSame(['POST', 'GET', 'GET', 'DELETE'], $hosts['api.test'] ?? null, 'French: directly to Supertext');
+        $page = $this->row('tl_page', (int) $report->targets[$s['de']]['pages'][0]['id']);
+        $this->assertFalse((bool) $page['supertext_review'], 'not copied to pages');
     }
 
     public function testLanguageMapChoosesTheSupertextCode(): void

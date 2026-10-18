@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Supertext\ContaoTranslation\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
+use Supertext\ContaoTranslation\Supertext\SupertextClient;
 use Supertext\ContaoTranslation\SupertextTranslationBundle;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
@@ -30,6 +31,7 @@ final class ConfigurationTest extends TestCase
         $this->assertSame(['tl_content' => ['myCustomField' => 'html', 'caption' => false]], $container->getParameter('supertext_translation.fields'));
         $this->assertSame('live', $container->getParameter('supertext_translation.environment'));
         $this->assertTrue($container->getParameter('supertext_translation.version_reports'), 'version reports are on by default');
+        $this->assertSame(SupertextClient::REVIEW_URL, $container->getParameter('supertext_translation.review_url'), 'Supertext\'s review service by default');
     }
 
     public function testVersionReportsCanBeSwitchedOff(): void
