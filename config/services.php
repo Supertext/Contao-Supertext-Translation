@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use Supertext\ContaoTranslation\Command\ApplyReviewCorrectionsCommand;
 use Supertext\ContaoTranslation\Controller\PingController;
+use Supertext\ContaoTranslation\Cron\ReviewCorrectionsCron;
 use Supertext\ContaoTranslation\Controller\TranslateController;
 use Supertext\ContaoTranslation\EventListener\RootLanguageListener;
 use Supertext\ContaoTranslation\EventListener\SupertextOperationListener;
@@ -15,6 +17,7 @@ use Supertext\ContaoTranslation\Translation\FieldMap;
 use Supertext\ContaoTranslation\Translation\FileExchange;
 use Supertext\ContaoTranslation\Translation\Languages;
 use Supertext\ContaoTranslation\Translation\PageTranslator;
+use Supertext\ContaoTranslation\Translation\ReviewCorrections;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\param;
@@ -53,6 +56,17 @@ return static function (ContainerConfigurator $container): void {
     ;
 
     $services->set(PageTranslator::class)->public();
+
+    // Corrections from Supertext Localization Review, hourly and with supertext:review:apply.
+    $services->set(ReviewCorrections::class)
+        ->arg('$logger', service('monolog.logger.contao.general')->nullOnInvalid())
+        ->public()
+    ;
+    $services->set(ApplyReviewCorrectionsCommand::class);
+    $services->set(ReviewCorrectionsCron::class)
+        ->arg('$enabled', param('supertext_translation.review_corrections'))
+        ->tag('contao.cronjob', ['interval' => 'hourly'])
+    ;
 
     // Export for translation / Import translation (XLIFF and HTML files).
     $services->set(FileExchange::class);

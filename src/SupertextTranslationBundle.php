@@ -23,6 +23,7 @@ use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
  *         environment: live                     # live | staging | testing (env var OK)
  *         api_url: ''                           # overrides environment (env var OK)
  *         review_url: 'https://…/v1/'           # Supertext's review service ('' = review off)
+ *         review_corrections: true              # write reviewers' corrections hourly (Contao cron)
  *         language_map: { de: de-CH }         # optional override of the roots' Supertext language
  *         politeness: { de: more }            # optional override of the roots' Formal or informal
  *         version_reports: true                 # SUPERTEXT_VERSION_REPORTS=0 also turns it off
@@ -47,6 +48,7 @@ final class SupertextTranslationBundle extends AbstractBundle
                 ->scalarNode('api_key')->defaultValue('%env(default::SUPERTEXT_API_KEY)%')->end()
                 ->scalarNode('environment')->info(implode(' | ', array_keys(SupertextClient::ENVIRONMENTS)))->defaultValue('live')->end()
                 ->scalarNode('api_url')->defaultValue('')->end()
+                ->booleanNode('review_corrections')->info('Write reviewers\' corrections into the translations hourly (Contao cron)')->defaultTrue()->end()
                 ->scalarNode('review_url')->info('Supertext review service for website roots with Translation review on (empty: off everywhere)')->defaultValue(SupertextClient::REVIEW_URL)->end()
                 // normalizeKeys(false): keep "de-CH" (Symfony would turn dashes into underscores)
                 ->arrayNode('language_map')->normalizeKeys(false)->useAttributeAsKey('language')->scalarPrototype()->end()->end()
@@ -82,6 +84,7 @@ final class SupertextTranslationBundle extends AbstractBundle
             ->set('supertext_translation.api_url', (string) $config['api_url'])
             ->set('supertext_translation.environment', (string) $config['environment'])
             ->set('supertext_translation.review_url', (string) $config['review_url'])
+            ->set('supertext_translation.review_corrections', $config['review_corrections'])
             ->set('supertext_translation.language_map', $config['language_map'])
             ->set('supertext_translation.politeness', $config['politeness'])
             ->set('supertext_translation.poll_interval_ms', $config['poll_interval'] * 1000)

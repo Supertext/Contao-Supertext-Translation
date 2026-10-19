@@ -6,6 +6,7 @@ namespace Supertext\ContaoTranslation\Supertext;
 
 use Supertext\ContaoTranslation\Reporting\Reporting;
 use Supertext\ContaoTranslation\Sdk\V1\Client;
+use Supertext\ContaoTranslation\Sdk\V1\Correction;
 use Supertext\ContaoTranslation\Sdk\V1\SupertextException as SdkException;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -179,6 +180,33 @@ class SupertextClient
         } finally {
             $this->sdk->delete($fileId);
         }
+    }
+
+    /**
+     * Corrections reviewers made that this site hasn't written yet (only the review service
+     * answers this; see forReview()). Follows all pages.
+     *
+     * @return list<Correction>
+     */
+    public function pendingCorrections(string|null $targetLang = null): array
+    {
+        return $this->call(fn () => $this->sdk->pendingCorrections($targetLang));
+    }
+
+    /**
+     * Confirms corrections written into Contao; returns how many the review service accepted.
+     *
+     * @param list<Correction> $corrections
+     */
+    public function acknowledgeCorrections(array $corrections): int
+    {
+        return [] === $corrections ? 0 : $this->call(fn () => $this->sdk->acknowledgeCorrections($corrections));
+    }
+
+    /** Whether this client talks to the review service (a review URL is configured). */
+    public function reviewEnabled(): bool
+    {
+        return null !== $this->makeReviewClient;
     }
 
     /** Cost-free check that the API key is accepted. */

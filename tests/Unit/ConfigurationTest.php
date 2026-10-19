@@ -32,6 +32,7 @@ final class ConfigurationTest extends TestCase
         $this->assertSame('live', $container->getParameter('supertext_translation.environment'));
         $this->assertTrue($container->getParameter('supertext_translation.version_reports'), 'version reports are on by default');
         $this->assertSame(SupertextClient::REVIEW_URL, $container->getParameter('supertext_translation.review_url'), 'Supertext\'s review service by default');
+        $this->assertTrue($container->getParameter('supertext_translation.review_corrections'), 'corrections are written hourly by default');
     }
 
     public function testVersionReportsCanBeSwitchedOff(): void

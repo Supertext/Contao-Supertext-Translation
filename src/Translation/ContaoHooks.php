@@ -10,6 +10,7 @@ use Contao\CoreBundle\ContaoCoreBundle;
 use Contao\CoreBundle\Framework\ContaoFramework;
 use Contao\CoreBundle\Slug\Slug;
 use Contao\PageModel;
+use Contao\System;
 use Contao\Versions;
 use Doctrine\DBAL\Connection;
 
@@ -55,6 +56,16 @@ class ContaoHooks
         try {
             $this->framework->initialize();
             $versions = new Versions($table, $id);
+
+            // Cron and console runs (reviewers' corrections) have no request: Contao would read the
+            // record's back-end edit link from it, so give the link explicitly.
+            if (null === System::getContainer()->get('request_stack')->getCurrentRequest()) {
+                $versions->setEditUrl(match ($table) {
+                    'tl_page' => 'contao?do=page&act=edit&id='.$id,
+                    'tl_article' => 'contao?do=article&act=edit&id='.$id,
+                    default => 'contao?do=article&table='.$table.'&act=edit&id='.$id,
+                });
+            }
             $versions->initialize();
             $this->pending[$table.'.'.$id] = $versions;
         } catch (\Throwable) {

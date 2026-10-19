@@ -25,6 +25,12 @@ final class FakeSupertext
     /** Answer this many requests with HTTP 429 (rate limit) first. */
     public int $rateLimited = 0;
 
+    /** @var list<array<string, mixed>> pending corrections the review service answers (raw items, as the API sends them) */
+    public array $corrections = [];
+
+    /** @var list<array{id: string, version: string}> acknowledged corrections */
+    public array $acknowledged = [];
+
     /** @var list<array{html: string, target: string, source: string, politeness: string, type: string}> every uploaded file */
     public array $submitted = [];
 
@@ -141,6 +147,21 @@ final class FakeSupertext
             $this->submitted[] = $this->files[$id];
 
             return new MockResponse(json_encode(['file_id' => $id]), ['response_headers' => ['content-type' => 'application/json']]);
+        }
+
+        // The review service's corrections (Supertext Localization Review).
+        if ('GET' === $method && preg_match('#/review/corrections\?(.*)$#', $url, $q)) {
+            parse_str($q[1], $query);
+            $items = array_values(array_filter($this->corrections, static fn (array $c) => !isset($query['target_lang']) || $c['target_lang'] === $query['target_lang']));
+
+            return new MockResponse((string) json_encode(['corrections' => $items, 'next_after' => null]));
+        }
+
+        if ('POST' === $method && str_ends_with($url, '/review/corrections/acknowledge')) {
+            $items = json_decode($body, true)['corrections'] ?? [];
+            $this->acknowledged = [...$this->acknowledged, ...$items];
+
+            return new MockResponse((string) json_encode(['acknowledged' => \count($items)]));
         }
 
         if (!preg_match('#translate/ai/file/([^/]+)(/status|/translation)?$#', $url, $m) || !isset($this->files[$m[1]])) {

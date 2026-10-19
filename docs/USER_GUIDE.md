@@ -68,7 +68,7 @@ Texts that weren't imported keep their current translation (a new page gets the 
 - **Existing translations are updated in place.** The previous version stays in the version history (*Restore* / version list of the record), so you can go back.
 - If the translated page's parent doesn't exist in the target language yet, Supertext translates the parent too, so the page tree stays the same in every language.
 - With the language switcher installed, translated pages are linked to their original: visitors can switch languages on the page.
-- **Translation review:** if your administrator turned on *Translation review* for a language, reviewers (your colleagues or Supertext linguists) check and correct the translations on the website. Their corrections come into Contao the next time you translate the pages into that language: after a review, translate them again. Texts reviewed once keep their corrected wording in later translations.
+- **Translation review:** if your administrator turned on *Translation review* for a language, reviewers (your colleagues or Supertext linguists) check and correct the translations on the website. Their corrections come into the translated pages by themselves within about an hour (you can undo them in the version history). A text you changed by hand after the translation is never overwritten: its correction arrives only when you translate the page again. Texts reviewed once keep their corrected wording in later translations.
 
 ![The German home page on the website after publishing: translated headings, bold and italic text, a link, an insert tag and a list, with the EN / DE-CH language switcher](images/06-website-german.png)
 

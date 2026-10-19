@@ -349,6 +349,144 @@ class PageTranslator
         return $report;
     }
 
+    /** Outcomes of {@see applyCorrection()}. */
+    public const CORRECTION_WRITTEN = 'written';
+    public const CORRECTION_CHANGED = 'changed';
+    public const CORRECTION_SOURCE_CHANGED = 'source_changed';
+    public const CORRECTION_NOT_TRANSLATED = 'not_translated';
+    public const CORRECTION_UNKNOWN = 'unknown';
+
+    private const PREFIX_TABLES = ['p' => 'tl_page', 'a' => 'tl_article', 'c' => 'tl_content'];
+
+    /**
+     * Writes one reviewer's correction (Supertext Localization Review) into the translation in
+     * $targetRootId, without translating again. $segmentId is the segment key the document was
+     * sent with (`c.12.text`: field `text` of the source content element 12); $sourceHtml,
+     * $previousHtml and $html are protected HTML as in the document.
+     *
+     * Written only when the field still holds what the review service delivered last
+     * ($previousHtml): an editor's change is never overwritten. Version history and cache tags
+     * as with a translation.
+     *
+     * @return self::CORRECTION_* written; changed (the field was edited since); source_changed
+     *                            (the source text is different now); not_translated (no
+     *                            translation of the record in that root); unknown (no such
+     *                            record, field or segment on this site)
+     */
+    public function applyCorrection(string $segmentId, int $targetRootId, string $sourceHtml, string $previousHtml, string $html): string
+    {
+        if (1 !== preg_match('/^([pac])\.(\d+)\.([A-Za-z0-9_]+)(?:\.[0-9A-Za-z.]+)?$/D', $segmentId, $m)) {
+            return self::CORRECTION_UNKNOWN;
+        }
+
+        [, $prefix, $sourceId, $field] = $m;
+        $table = self::PREFIX_TABLES[$prefix];
+        $type = $this->fields->fieldsFor($table)[$field] ?? null;
+        $source = $this->connection->fetchAssociative("SELECT * FROM $table WHERE id = ?", [(int) $sourceId]) ?: null;
+        $sourcePageId = null === $source ? null : $this->pageOfRecord($table, $source);
+
+        if (null === $type || null === $sourcePageId || !\in_array($targetRootId, array_column($this->targetRoots($sourcePageId), 'id'), true)) {
+            return self::CORRECTION_UNKNOWN;
+        }
+
+        $doc = $this->collect($sourcePageId)['doc'] ?? null;
+        $current = $doc?->segments()[$segmentId] ?? null;
+
+        if (null === $doc || null === $current) {
+            return self::CORRECTION_UNKNOWN;
+        }
+
+        if (self::normalized($current) !== self::normalized($sourceHtml)) {
+            return self::CORRECTION_SOURCE_CHANGED;
+        }
+
+        $targetId = $this->targetRecord($table, $source, $targetRootId);
+
+        if (null === $targetId) {
+            return self::CORRECTION_NOT_TRANSLATED;
+        }
+
+        $target = $this->connection->fetchAssociative("SELECT * FROM $table WHERE id = ?", [$targetId]) ?: [];
+        $fieldKey = $prefix.'.'.$sourceId.'.'.$field;
+        // The target field's parts under the source's keys (list items, table cells keep their positions).
+        $inTarget = FieldCodec::segments($type, $fieldKey, $target[$field] ?? '')[$segmentId] ?? null;
+        $previous = $doc->restore([$segmentId => $previousHtml])[$segmentId] ?? null;
+        $corrected = $doc->restore([$segmentId => $html])[$segmentId] ?? null;
+
+        if (null === $inTarget || null === $previous || null === $corrected || !self::sameText($type, $inTarget, $previous)) {
+            return self::CORRECTION_CHANGED;
+        }
+
+        $value = FieldCodec::apply($type, $fieldKey, $target[$field], [$segmentId => $corrected], $this->encoding($table, $field));
+        $this->connection->transactional(fn () => $this->update($table, $targetId, [$field => $value]));
+        $this->hooks->invalidate(['contao.db.'.$table.'.'.$targetId]);
+
+        return self::CORRECTION_WRITTEN;
+    }
+
+    /** Page a source record is on (the page itself for tl_page; nested elements up to their article). */
+    private function pageOfRecord(string $table, array $row): int|null
+    {
+        for ($i = 0; $i < 100; ++$i) {
+            if ('tl_page' === $table) {
+                return (int) $row['id'];
+            }
+
+            if ('tl_article' === $table) {
+                return (int) $row['pid'];
+            }
+
+            $table = (string) $row['ptable'] ?: 'tl_article';
+
+            if (!\in_array($table, ['tl_article', 'tl_content'], true)) {
+                return null; // news, events, … are not translated
+            }
+
+            $row = $this->connection->fetchAssociative("SELECT * FROM $table WHERE id = ?", [(int) $row['pid']]) ?: null;
+
+            if (null === $row) {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    /** The translation of a source record in a target root, following its parents the way {@see write()} does. */
+    private function targetRecord(string $table, array $row, int $targetRootId): int|null
+    {
+        if ('tl_page' === $table) {
+            return 'root' === $row['type'] ? null : $this->findTargetPage((int) $row['id'], $targetRootId);
+        }
+
+        if ('tl_article' === $table) {
+            $page = $this->findTargetPage((int) $row['pid'], $targetRootId);
+
+            return null === $page ? null : $this->findChild('tl_article', $page, null, (int) $row['id']);
+        }
+
+        $ptable = (string) $row['ptable'] ?: 'tl_article';
+        $parent = $this->connection->fetchAssociative("SELECT * FROM $ptable WHERE id = ?", [(int) $row['pid']]) ?: null;
+        $targetParent = null === $parent ? null : $this->targetRecord($ptable, $parent, $targetRootId);
+
+        return null === $targetParent ? null : $this->findChild('tl_content', $targetParent, $ptable, (int) $row['id']);
+    }
+
+    /** Whether the target field still holds the delivered text (plain text fields compare as text). */
+    private static function sameText(string $type, string $inTarget, string $delivered): bool
+    {
+        if (\in_array($type, ['text', 'inputUnit'], true)) {
+            return FieldCodec::htmlToText($inTarget) === FieldCodec::htmlToText($delivered);
+        }
+
+        return self::normalized($inTarget) === self::normalized($delivered);
+    }
+
+    private static function normalized(string $html): string
+    {
+        return trim((string) preg_replace('/\s+/u', ' ', $html));
+    }
+
     /**
      * A page with its articles and content elements, and the document of their texts.
      *
