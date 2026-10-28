@@ -182,7 +182,7 @@ Protocol: [Commando-Center-Supertext-Translation](https://github.com/Supertext/C
 
 ## CI
 
-`.github/workflows/ci.yml`: unit tests on PHP 8.3 and 8.4; integration tests against Contao 5.7 (PHP 8.3) and Contao 6.0 (PHP 8.4) with a MySQL 8.4 service; PHPStan (see *Code quality and security checks*). `.github/workflows/checks.yml` and `links.yml` lint the workflows and check the links. `.github/workflows/e2e.yml` runs the end-to-end test against the real Supertext API and regenerates the docs screenshots (see *End-to-end tests*).
+`.github/workflows/ci.yml`: unit tests on PHP 8.3, 8.4 and 8.5; integration tests against Contao 5.7 (PHP 8.3) and Contao 6.0 (PHP 8.4 and 8.5) with a MySQL 8.4 service; PHPStan (see *Code quality and security checks*). `.github/workflows/checks.yml` and `links.yml` lint the workflows and check the links. `.github/workflows/e2e.yml` runs the end-to-end test against the real Supertext API and regenerates the docs screenshots (see *End-to-end tests*).
 
 ## End-to-end tests
 

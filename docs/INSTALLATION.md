@@ -7,7 +7,7 @@ For administrators who set up a Contao installation. Editors: see the [User guid
 | | |
 | --- | --- |
 | Contao | 5.7 (LTS) or 6.0 |
-| PHP | 8.3 or newer (Contao 6 needs 8.4) |
+| PHP | 8.3 or newer (Contao 6 needs 8.4); tested on 8.3, 8.4 and 8.5 |
 | Database | MySQL 8.0/8.4 or MariaDB 10.11+ (as required by Contao; MySQL 9 is not supported by Contao) |
 | Multilingual site | One **website root per language** in the site structure, each with its own *Language* setting (e.g. `en`, `de-CH`, `fr-CH`) |
 | Supertext | A Supertext account and an API key with access to AI translation (see [API key](#api-key)) |
