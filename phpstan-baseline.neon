@@ -21,9 +21,3 @@ parameters:
 			identifier: class.notFound
 			count: 1
 			path: src/Translation/ContaoHooks.php
-		-
-			# Group 1 is '' when the alternative (group 2) matched; PHPStan infers it as always non-empty.
-			message: '#^Strict comparison using \!\=\= between '''' and numeric\-string will always evaluate to true\.$#'
-			identifier: notIdentical.alwaysTrue
-			count: 1
-			path: src/Html/Protector.php
